@@ -1,0 +1,13 @@
+node_modules/
+.next/
+.env
+.env.*
+blueprint/
+test_md/
+storage/*.db
+storage/*.db-wal
+storage/*.db-shm
+storage/uploads/*
+storage/backups/*
+!storage/uploads/.gitkeep
+!storage/backups/.gitkeep
