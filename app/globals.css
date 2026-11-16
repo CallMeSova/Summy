@@ -185,7 +185,6 @@ kbd {
   border-radius: 6px; border: 1px solid var(--border); background: var(--bg-subtle);
 }
 .foot-card svg { color: var(--muted); flex: none; }
-.sidebar-close { display: none; }
 
 .main {
   flex: 1; margin-left: var(--sidebar-w); min-width: 0; position: relative; z-index: 1;
@@ -206,7 +205,6 @@ kbd {
 }
 .search-trigger:hover { border-color: var(--border-hover); background: var(--surface); }
 .search-trigger span { flex: 1; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.menu-btn { display: none; }
 .content { padding: 36px 32px 72px; width: 100%; max-width: 1180px; margin: 0 auto; flex: 1; }
 .scrim { position: fixed; inset: 0; background: rgba(0, 0, 0, .55); z-index: 35; backdrop-filter: blur(2px); }
 

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard, Library, Search, Bookmark, History, Settings, PlusCircle, Menu, Moon, Sun,
-  Languages, Command, CornerDownLeft, BookOpen, FolderOpen, X, Monitor, HardDrive,
+  Languages, Command, CornerDownLeft, BookOpen, FolderOpen, Monitor, HardDrive,
 } from "lucide-react";
 import { useApp } from "./Providers";
 import { api } from "@/lib/client";
@@ -127,6 +127,7 @@ export default function Shell({ children }) {
   const path = usePathname();
   const router = useRouter();
   const [drawer, setDrawer] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
   const [palette, setPalette] = useState(false);
 
   useEffect(() => { setDrawer(false); }, [path]);
@@ -147,8 +148,18 @@ export default function Shell({ children }) {
   const ThemeIcon = theme === "dark" ? Moon : theme === "light" ? Sun : Monitor;
   const nextTheme = { light: "dark", dark: "system", system: "light" }[theme];
 
+  function toggleMenu() {
+    if (typeof window !== "undefined" && window.innerWidth <= 1024) {
+      setDrawer((d) => !d);
+    } else if (focus) {
+      setFocus(false);
+    } else {
+      setCollapsed((c) => !c);
+    }
+  }
+
   return (
-    <div className={`app ${focus ? "focus-mode" : ""}`}>
+    <div className={`app ${focus || collapsed ? "focus-mode" : ""}`}>
       {drawer && <div className="scrim" onClick={() => setDrawer(false)} />}
       <aside className={`sidebar ${drawer ? "open" : ""}`}>
         <div className="sidebar-top">
@@ -157,7 +168,6 @@ export default function Shell({ children }) {
             <span className="brand-name">{t("app.name")}</span>
             <span className="brand-badge">Docs</span>
           </Link>
-          <button className="icon-btn sidebar-close" onClick={() => setDrawer(false)} aria-label={t("common.close")}><X size={18} /></button>
         </div>
 
         <nav className="nav">
@@ -188,21 +198,29 @@ export default function Shell({ children }) {
 
       <div className="main">
         <header className="topbar">
-          <button className="icon-btn menu-btn" onClick={() => setDrawer(true)} aria-label={t("nav.menu")}><Menu size={18} /></button>
-          <button className="search-trigger" onClick={() => setPalette(true)}>
+          <button
+            type="button"
+            className="icon-btn menu-btn"
+            onClick={toggleMenu}
+            aria-label={t("nav.menu")}
+            title={t("nav.menu")}
+          >
+            <Menu size={18} />
+          </button>
+          <button type="button" className="search-trigger" onClick={() => setPalette(true)}>
             <Search size={15} />
             <span>{t("palette.placeholder")}</span>
             <kbd><Command size={10} />K</kbd>
           </button>
           <div className="topbar-actions">
-            <button className="icon-btn lang-btn" onClick={() => setLocale(locale === "th" ? "en" : "th")} aria-label="Language">
+            <button type="button" className="icon-btn lang-btn" onClick={() => setLocale(locale === "th" ? "en" : "th")} aria-label="Language">
               <Languages size={16} />
               <b>{locale === "th" ? "TH" : "EN"}</b>
             </button>
-            <button className="icon-btn" onClick={() => setTheme(nextTheme)} aria-label={t("settings.theme")} title={t(`settings.${theme}`)}>
+            <button type="button" className="icon-btn" onClick={() => setTheme(nextTheme)} aria-label={t("settings.theme")} title={t(`settings.${theme}`)}>
               <ThemeIcon size={16} />
             </button>
-            <button className="btn btn-primary btn-sm hide-sm" onClick={() => router.push("/lessons/new")}>
+            <button type="button" className="btn btn-primary btn-sm hide-sm" onClick={() => router.push("/lessons/new")}>
               <PlusCircle size={15} /> {t("course.addLesson")}
             </button>
           </div>

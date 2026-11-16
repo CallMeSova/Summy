@@ -1,8 +1,8 @@
 "use client";
-import { use, useCallback, useEffect, useRef, useState } from "react";
+import { use, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
-  ChevronLeft, ChevronRight, Minus, Plus, Maximize2, Minimize2, Pencil, CheckCircle2, Check, ExternalLink, FileWarning, Type,
+  ChevronLeft, ChevronRight, ChevronDown, Minus, Plus, Maximize2, Minimize2, Pencil, CheckCircle2, Check, ExternalLink, FileWarning, Type, ChevronsDownUp, ChevronsUpDown,
 } from "lucide-react";
 import dynamic from "next/dynamic";
 import { useApp } from "@/components/Providers";
@@ -18,12 +18,31 @@ function safeParse(s) {
   try { return JSON.parse(s); } catch { return null; }
 }
 
+function buildTocGroups(items) {
+  if (!items.length) return [];
+  // Skip a leading h1 if it matches the document title or if h2 is the main chapter level
+  const h1Count = items.filter((x) => x.level === 1).length;
+  const h2Count = items.filter((x) => x.level === 2).length;
+  const majorMaxLevel = h1Count > 1 && h2Count === 0 ? 1 : 2;
+
+  const groups = [];
+  for (const item of items) {
+    if (item.level <= majorMaxLevel || !groups.length) {
+      groups.push({ ...item, children: [] });
+    } else {
+      groups[groups.length - 1].children.push(item);
+    }
+  }
+  return groups;
+}
+
 export default function Reader({ params }) {
   const { id } = use(params);
   const { t, fontSize, setFontSize, width, setWidth, docFont, setDocFont, focus, setFocus, toast } = useApp();
   const { data: lesson, error, loading, reload, setData } = useFetch(`/lessons/${id}`);
   const [prog, setProg] = useState(0);
   const [toc, setToc] = useState([]);
+  const [collapsedIds, setCollapsedIds] = useState({});
   const [activeToc, setActiveToc] = useState("");
   const [ready, setReady] = useState(0);
   const restored = useRef(false);
@@ -46,6 +65,7 @@ export default function Reader({ params }) {
     opened.current = lesson.id;
     setProg(lesson.completed ? 100 : lesson.progress);
     setToc([]);
+    setCollapsedIds({});
     restored.current = false;
     window.scrollTo({ top: 0 });
     api(`/lessons/${lesson.id}/progress`, { method: "PUT", json: { open: true } }).catch(() => {});
@@ -104,6 +124,24 @@ export default function Reader({ params }) {
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => { window.removeEventListener("scroll", onScroll); cancelAnimationFrame(raf); };
   }, [lesson, flush]);
+
+  const tocGroups = useMemo(() => buildTocGroups(toc), [toc]);
+  const collapsibleGroups = useMemo(() => tocGroups.filter((g) => g.children.length > 0), [tocGroups]);
+  const allCollapsed = collapsibleGroups.length > 0 && collapsibleGroups.every((g) => collapsedIds[g.id]);
+
+  function toggleGroup(gid) {
+    setCollapsedIds((prev) => ({ ...prev, [gid]: !prev[gid] }));
+  }
+
+  function toggleAllGroups() {
+    if (allCollapsed) {
+      setCollapsedIds({});
+    } else {
+      const next = {};
+      for (const g of collapsibleGroups) next[g.id] = true;
+      setCollapsedIds(next);
+    }
+  }
 
   async function toggleBookmark() {
     const r = await api(`/lessons/${id}/bookmark`, { method: "POST" });
@@ -209,15 +247,77 @@ export default function Reader({ params }) {
         </article>
 
         {!isPdf && (
-          <aside className="toc" aria-label={t("reader.toc")} style={{ visibility: toc.length ? "visible" : "hidden" }}>
-            <h4>{t("reader.toc")}</h4>
-            <div className="toc-list">
-              {toc.map((h) => (
-                <a key={h.id} href={`#${h.id}`} className={`l${h.level} ${activeToc === h.id ? "on" : ""}`}
-                  onClick={(e) => { e.preventDefault(); document.getElementById(h.id)?.scrollIntoView({ behavior: "smooth", block: "start" }); }}>
-                  {h.text}
-                </a>
-              ))}
+          <aside className="toc" aria-label={t("reader.toc")} style={{ visibility: tocGroups.length ? "visible" : "hidden" }}>
+            <div className="toc-head">
+              <h4>{t("reader.toc")}</h4>
+              {collapsibleGroups.length > 0 && (
+                <button
+                  type="button"
+                  className="toc-collapse-all"
+                  onClick={toggleAllGroups}
+                  title={allCollapsed ? t("reader.expandAll") : t("reader.collapseAll")}
+                >
+                  {allCollapsed ? <ChevronsUpDown size={13} /> : <ChevronsDownUp size={13} />}
+                  <span>{allCollapsed ? t("reader.expandAll") : t("reader.collapseAll")}</span>
+                </button>
+              )}
+            </div>
+            <div className="toc-tree">
+              {tocGroups.map((g) => {
+                const hasKids = g.children.length > 0;
+                const isCollapsed = !!collapsedIds[g.id];
+                const childActive = g.children.some((c) => c.id === activeToc);
+                const parentActive = activeToc === g.id || (isCollapsed && childActive);
+
+                return (
+                  <div key={g.id} className={`toc-group ${parentActive || childActive ? "in-view" : ""}`}>
+                    <div className={`toc-parent-row ${parentActive ? "on" : ""}`}>
+                      {hasKids ? (
+                        <button
+                          type="button"
+                          className="toc-toggle"
+                          onClick={() => toggleGroup(g.id)}
+                          aria-expanded={!isCollapsed}
+                          aria-label={g.text}
+                        >
+                          {isCollapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
+                        </button>
+                      ) : (
+                        <span className="toc-bullet" aria-hidden="true" />
+                      )}
+                      <a
+                        href={`#${g.id}`}
+                        className={`toc-parent ${parentActive ? "on" : ""}`}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          document.getElementById(g.id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+                        }}
+                      >
+                        <span className="toc-parent-text">{g.text}</span>
+                        {hasKids && isCollapsed && <span className="toc-count">{g.children.length}</span>}
+                      </a>
+                    </div>
+
+                    {hasKids && !isCollapsed && (
+                      <div className="toc-children">
+                        {g.children.map((c) => (
+                          <a
+                            key={c.id}
+                            href={`#${c.id}`}
+                            className={`toc-sub l${c.level} ${activeToc === c.id ? "on" : ""}`}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              document.getElementById(c.id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+                            }}
+                          >
+                            {c.text}
+                          </a>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </aside>
         )}
