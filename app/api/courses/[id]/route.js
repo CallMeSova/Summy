@@ -1,6 +1,6 @@
-import { get, run, tx } from "@/lib/db";
+import { get, run, tx, batch } from "@/lib/db";
 import { handler, ok, body, str, intId, ApiError } from "@/lib/api";
-import { getCourse, lessonsOfCourse, nextPosition, bool } from "@/lib/repo";
+import { courseSelectSql, lessonCardSql, getCourse, nextPosition, bool } from "@/lib/repo";
 import { requireUser } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
@@ -8,9 +8,15 @@ export const dynamic = "force-dynamic";
 export const GET = handler(async (_req, { params }) => {
   const user = await requireUser();
   const id = intId((await params).id);
-  const course = await getCourse(user.id, id);
+  const [courseRows, lessonRows, subjectRows] = await batch([
+    [`${courseSelectSql()} WHERE c.id=? AND s.user_id=?`, id, user.id],
+    [`${lessonCardSql()} WHERE l.course_id=? AND s.user_id=? ORDER BY l.position, l.id`, id, user.id],
+    ["SELECT * FROM subjects WHERE user_id=? ORDER BY position, id", user.id],
+  ]);
+
+  const course = courseRows[0];
   if (!course) throw new ApiError(404, "Course not found");
-  const lessons = (await lessonsOfCourse(user.id, id)).map(bool);
+  const lessons = lessonRows.map(bool);
   const resume =
     [...lessons]
       .filter((l) => l.last_read_at && !l.completed)
@@ -18,7 +24,7 @@ export const GET = handler(async (_req, { params }) => {
     lessons.find((l) => !l.completed) ||
     lessons[0] ||
     null;
-  return ok({ ...course, lessons, resume_lesson_id: resume ? resume.id : null });
+  return ok({ ...course, lessons, subjects: subjectRows, resume_lesson_id: resume ? resume.id : null });
 });
 
 export const PATCH = handler(async (req, { params }) => {

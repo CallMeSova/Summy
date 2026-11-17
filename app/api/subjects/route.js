@@ -1,4 +1,4 @@
-import { all, get, run } from "@/lib/db";
+import { all, get, run, batch } from "@/lib/db";
 import { handler, ok, body, str } from "@/lib/api";
 import { nextPosition } from "@/lib/repo";
 import { requireUser } from "@/lib/auth";
@@ -38,8 +38,11 @@ export const PUT = handler(async (req) => {
   const user = await requireUser();
   const b = await body(req);
   const order = Array.isArray(b.order) ? b.order.slice(0, 500) : [];
-  for (let i = 0; i < order.length; i++) {
-    await run("UPDATE subjects SET position=? WHERE id=? AND user_id=?", i, Number(order[i]), user.id);
+  if (order.length) {
+    await batch(
+      order.map((id, i) => ["UPDATE subjects SET position=? WHERE id=? AND user_id=?", i, Number(id), user.id]),
+      "write"
+    );
   }
   return ok({ ok: true });
 });

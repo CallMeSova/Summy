@@ -8,8 +8,7 @@ import { SubjectModal, CourseModal } from "@/components/LibraryModals";
 
 export default function LibraryPage() {
   const { t, toast } = useApp();
-  const subj = useFetch("/subjects");
-  const crs = useFetch("/courses");
+  const lib = useFetch("/courses?withSubjects=1");
   const [q, setQ] = useState("");
   const [filter, setFilter] = useState("all");
   const [sort, setSort] = useState("manual");
@@ -18,22 +17,24 @@ export default function LibraryPage() {
   const [del, setDel] = useState(null); // {kind,item}
   const [busy, setBusy] = useState(false);
 
-  const reload = () => { subj.reload(); crs.reload(); };
+  const reload = () => lib.reload();
+  const subjectsData = lib.data?.subjects;
+  const coursesData = lib.data?.courses;
 
   const groups = useMemo(() => {
-    if (!subj.data || !crs.data) return [];
+    if (!subjectsData || !coursesData) return [];
     const needle = q.trim().toLowerCase();
-    return subj.data
+    return subjectsData
       .filter((s) => filter === "all" || String(s.id) === filter)
       .map((s) => {
-        let list = crs.data.filter((c) => c.subject_id === s.id);
+        let list = coursesData.filter((c) => c.subject_id === s.id);
         if (needle) list = list.filter((c) => (c.title + " " + c.description).toLowerCase().includes(needle));
         if (sort === "name") list = [...list].sort((a, b) => a.title.localeCompare(b.title));
         if (sort === "progress") list = [...list].sort((a, b) => b.progress - a.progress);
         if (sort === "newest") list = [...list].sort((a, b) => b.created_at.localeCompare(a.created_at));
         return { subject: s, courses: list };
       });
-  }, [subj.data, crs.data, q, filter, sort]);
+  }, [subjectsData, coursesData, q, filter, sort]);
 
   async function move(kind, list, idx, dir) {
     const arr = list.map((x) => x.id);
@@ -59,9 +60,9 @@ export default function LibraryPage() {
     }
   }
 
-  if (subj.error || crs.error) return <ErrorState error={subj.error || crs.error} onRetry={reload} />;
-  const loading = subj.loading || crs.loading || !subj.data || !crs.data;
-  const subjects = subj.data || [];
+  if (lib.error) return <ErrorState error={lib.error} onRetry={reload} />;
+  const loading = lib.loading || !subjectsData || !coursesData;
+  const subjects = subjectsData || [];
 
   return (
     <>

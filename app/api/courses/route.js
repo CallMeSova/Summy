@@ -1,4 +1,4 @@
-import { all, get, run } from "@/lib/db";
+import { all, get, run, batch } from "@/lib/db";
 import { handler, ok, body, str, intId, ApiError } from "@/lib/api";
 import { courseSelectSql, getCourse, nextPosition } from "@/lib/repo";
 import { requireUser } from "@/lib/auth";
@@ -9,6 +9,20 @@ export const GET = handler(async (req) => {
   const user = await requireUser();
   const sp = new URL(req.url).searchParams;
   const subject = sp.get("subject");
+  const withSubjects = sp.get("withSubjects") === "1";
+
+  if (withSubjects) {
+    const [subjects, courses] = await batch([
+      [
+        `SELECT s.*, (SELECT COUNT(*) FROM courses c WHERE c.subject_id=s.id) AS course_count
+         FROM subjects s WHERE s.user_id=? ORDER BY s.position, s.id`,
+        user.id,
+      ],
+      [`${courseSelectSql()} WHERE s.user_id=? ORDER BY s.position, c.position, c.id`, user.id],
+    ]);
+    return ok({ subjects, courses });
+  }
+
   const rows = subject
     ? await all(
         `${courseSelectSql()} WHERE c.subject_id=? AND s.user_id=? ORDER BY c.position, c.id`,
@@ -44,12 +58,15 @@ export const PUT = handler(async (req) => {
   const user = await requireUser();
   const b = await body(req);
   const order = Array.isArray(b.order) ? b.order.slice(0, 500) : [];
-  for (let i = 0; i < order.length; i++) {
-    await run(
-      `UPDATE courses SET position=? WHERE id=? AND subject_id IN (SELECT id FROM subjects WHERE user_id=?)`,
-      i,
-      Number(order[i]),
-      user.id
+  if (order.length) {
+    await batch(
+      order.map((id, i) => [
+        `UPDATE courses SET position=? WHERE id=? AND subject_id IN (SELECT id FROM subjects WHERE user_id=?)`,
+        i,
+        Number(id),
+        user.id,
+      ]),
+      "write"
     );
   }
   return ok({ ok: true });

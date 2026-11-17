@@ -1,4 +1,4 @@
-import { all } from "@/lib/db";
+import { batch } from "@/lib/db";
 import { handler, ok } from "@/lib/api";
 import { lessonCardSql, courseSelectSql, bool } from "@/lib/repo";
 import { requireUser } from "@/lib/auth";
@@ -27,22 +27,22 @@ export const GET = handler(async (req) => {
   if (!q) return ok({ q, subjects: [], courses: [], lessons: [] });
   const like = `%${esc(q)}%`;
 
-  const subjects = await all(
-    `SELECT * FROM subjects WHERE user_id=? AND (name LIKE ? ESCAPE '\\' OR description LIKE ? ESCAPE '\\')
-     ORDER BY position LIMIT 20`,
-    uid,
-    like,
-    like
-  );
-  const courses = await all(
-    `${courseSelectSql()} WHERE s.user_id=? AND (c.title LIKE ? ESCAPE '\\' OR c.description LIKE ? ESCAPE '\\')
-     ORDER BY c.position LIMIT 30`,
-    uid,
-    like,
-    like
-  );
-  const lessons = (
-    await all(
+  const [subjects, courses, lessonRows] = await batch([
+    [
+      `SELECT * FROM subjects WHERE user_id=? AND (name LIKE ? ESCAPE '\\' OR description LIKE ? ESCAPE '\\')
+       ORDER BY position LIMIT 20`,
+      uid,
+      like,
+      like,
+    ],
+    [
+      `${courseSelectSql()} WHERE s.user_id=? AND (c.title LIKE ? ESCAPE '\\' OR c.description LIKE ? ESCAPE '\\')
+       ORDER BY c.position LIMIT 30`,
+      uid,
+      like,
+      like,
+    ],
+    [
       `SELECT x.*, l2.content_text FROM (${lessonCardSql()}) x JOIN lessons l2 ON l2.id=x.id
        WHERE x.user_id=? AND (
          l2.title LIKE ? ESCAPE '\\' OR l2.description LIKE ? ESCAPE '\\'
@@ -54,9 +54,11 @@ export const GET = handler(async (req) => {
       like,
       like,
       like,
-      like
-    )
-  ).map((r) => {
+      like,
+    ],
+  ]);
+
+  const lessons = lessonRows.map((r) => {
     const { content_text, ...rest } = bool(r);
     const inTitle = r.title.toLowerCase().includes(q.toLowerCase());
     return { ...rest, snippet: inTitle ? "" : snippet(content_text, q) || snippet(r.description, q) };

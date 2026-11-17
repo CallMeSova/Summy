@@ -15,7 +15,7 @@ export default function CoursePage({ params }) {
   const { t, toast } = useApp();
   const router = useRouter();
   const { data: course, error, loading, reload } = useFetch(`/courses/${id}`);
-  const { data: subjects } = useFetch("/subjects");
+  const subjects = course?.subjects;
   const [edit, setEdit] = useState(false);
   const [delCourse, setDelCourse] = useState(false);
   const [delLesson, setDelLesson] = useState(null);

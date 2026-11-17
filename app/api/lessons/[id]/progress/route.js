@@ -1,4 +1,4 @@
-import { get, run, tx } from "@/lib/db";
+import { batch } from "@/lib/db";
 import { handler, ok, body, intId, ApiError } from "@/lib/api";
 import { requireUser } from "@/lib/auth";
 
@@ -8,18 +8,23 @@ export const dynamic = "force-dynamic";
 export const PUT = handler(async (req, { params }) => {
   const user = await requireUser();
   const id = intId((await params).id);
-  const owned = await get(
-    `SELECT l.id FROM lessons l
-     JOIN courses c ON c.id=l.course_id
-     JOIN subjects s ON s.id=c.subject_id
-     WHERE l.id=? AND s.user_id=?`,
-    id,
-    user.id
-  );
-  if (!owned) throw new ApiError(404, "Lesson not found");
-
   const b = await body(req);
-  const cur = await get("SELECT * FROM reading_progress WHERE user_id=? AND lesson_id=?", user.id, id);
+
+  const [ownedRows, curRows] = await batch([
+    [
+      `SELECT l.id FROM lessons l
+       JOIN courses c ON c.id=l.course_id
+       JOIN subjects s ON s.id=c.subject_id
+       WHERE l.id=? AND s.user_id=?`,
+      id,
+      user.id,
+    ],
+    ["SELECT * FROM reading_progress WHERE user_id=? AND lesson_id=?", user.id, id],
+  ]);
+
+  if (!ownedRows[0]) throw new ApiError(404, "Lesson not found");
+  const cur = curRows[0];
+
   let progress = cur ? Number(cur.progress) : 0;
   let completed = cur ? Number(cur.completed) : 0;
   let quizScore = cur?.quiz_score !== undefined && cur?.quiz_score !== null ? Number(cur.quiz_score) : null;
@@ -45,8 +50,8 @@ export const PUT = handler(async (req, { params }) => {
     quizTotal = qt;
   }
 
-  await tx(async () => {
-    await run(
+  const writeStmts = [
+    [
       `INSERT INTO reading_progress (user_id, lesson_id, progress, completed, quiz_score, quiz_total, last_read_at)
        VALUES (?,?,?,?,?,?,strftime('%Y-%m-%dT%H:%M:%fZ','now'))
        ON CONFLICT(user_id, lesson_id) DO UPDATE SET
@@ -60,12 +65,14 @@ export const PUT = handler(async (req, { params }) => {
       progress,
       completed,
       quizScore,
-      quizTotal
-    );
-    if (b.open) {
-      await run("INSERT INTO reading_history (user_id, lesson_id) VALUES (?,?)", user.id, id);
-    }
-  });
+      quizTotal,
+    ],
+  ];
+  if (b.open) {
+    writeStmts.push(["INSERT INTO reading_history (user_id, lesson_id) VALUES (?,?)", user.id, id]);
+  }
+  await batch(writeStmts, "write");
+
   return ok({
     progress,
     completed: !!completed,
