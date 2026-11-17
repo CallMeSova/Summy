@@ -1,7 +1,7 @@
 "use client";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { translate } from "@/lib/i18n";
-import { api } from "@/lib/client";
+import { api, preloadAll } from "@/lib/client";
 import { CheckCircle2, AlertCircle, Info, X } from "lucide-react";
 
 const Ctx = createContext(null);
@@ -71,6 +71,12 @@ export default function Providers({ initial, children }) {
   useEffect(() => {
     document.documentElement.dataset.docFont = docFont;
   }, [docFont]);
+
+  useEffect(() => {
+    if (user) {
+      preloadAll();
+    }
+  }, [user]);
 
   const toast = useCallback((message, kind = "success") => {
     const tid = ++id.current;

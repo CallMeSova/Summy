@@ -6,7 +6,7 @@ import {
 } from "lucide-react";
 import dynamic from "next/dynamic";
 import { useApp } from "@/components/Providers";
-import { api, useFetch } from "@/lib/client";
+import { api, useFetch, invalidateCache, preloadAll } from "@/lib/client";
 import { Breadcrumbs, BookmarkButton, TypeBadge, ErrorState, Skeleton, EmptyState } from "@/components/ui";
 import { MarkdownView } from "@/components/content";
 import QuizModal, { extractQuizFromMarkdown } from "@/components/QuizModal";
@@ -56,9 +56,14 @@ export default function Reader({ params }) {
     if (pending.current == null) return;
     const p = pending.current;
     pending.current = null;
+    invalidateCache();
     fetch(`/api/lessons/${id}/progress`, {
       method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ progress: p }), keepalive: !!keepalive,
-    }).catch(() => {});
+    })
+      .then(() => {
+        if (!keepalive) preloadAll({ force: true });
+      })
+      .catch(() => {});
   }, [id]);
 
   // record the open event + initial progress

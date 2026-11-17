@@ -6,7 +6,7 @@ import {
   CheckCircle2, Circle, PlayCircle, AlertTriangle, Inbox, ClipboardCheck,
 } from "lucide-react";
 import { useApp } from "./Providers";
-import { api } from "@/lib/client";
+import { api, prefetchApi } from "@/lib/client";
 import QuizModal, { extractQuizFromMarkdown } from "./QuizModal";
 
 export function Modal({ open, onClose, title, children, footer, size = "md" }) {
@@ -215,7 +215,13 @@ export function StatusBadge({ progress, completed }) {
 export function CourseCard({ course, actions }) {
   const { t } = useApp();
   return (
-    <Link href={`/courses/${course.id}`} className="card course-card hoverable" style={{ "--accent": course.subject_color }}>
+    <Link
+      href={`/courses/${course.id}`}
+      className="card course-card hoverable"
+      style={{ "--accent": course.subject_color }}
+      onMouseEnter={() => prefetchApi(`/courses/${course.id}`)}
+      onFocus={() => prefetchApi(`/courses/${course.id}`)}
+    >
       <div className="course-card-top">
         <span className="chip" style={{ "--chip": course.subject_color }}><i />{course.subject_name}</span>
         {actions}
@@ -274,7 +280,16 @@ export function LessonItem({ lesson, index, actions, href }) {
 
   return (
     <>
-      <Link href={href || `/lessons/${lesson.id}`} className="lesson-item">
+      <Link
+        href={href || `/lessons/${lesson.id}`}
+        className="lesson-item"
+        onMouseEnter={() => {
+          if (lesson.content_type !== "pdf") prefetchApi(`/lessons/${lesson.id}`);
+        }}
+        onFocus={() => {
+          if (lesson.content_type !== "pdf") prefetchApi(`/lessons/${lesson.id}`);
+        }}
+      >
         <span className={`lesson-num ${isDone ? "done" : ""}`}>
           {isDone ? <CheckCircle2 size={18} /> : index}
         </span>
