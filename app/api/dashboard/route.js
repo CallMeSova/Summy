@@ -1,28 +1,60 @@
 import { all, get, run } from "@/lib/db";
 import { handler, ok, body } from "@/lib/api";
-import { COURSE_SELECT, LESSON_CARD, bool } from "@/lib/repo";
+import { courseSelectSql, lessonCardSql, bool } from "@/lib/repo";
+import { requireUser } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
 export const GET = handler(async () => {
-  const totals = get(`
-    SELECT (SELECT COUNT(*) FROM subjects) AS subjects,
-           (SELECT COUNT(*) FROM courses) AS courses,
-           (SELECT COUNT(*) FROM lessons) AS lessons,
-           (SELECT COUNT(*) FROM reading_progress WHERE completed=1) AS completed,
-           (SELECT COUNT(*) FROM bookmarks) AS bookmarks`);
-  const continueRow = get(
-    `${LESSON_CARD} WHERE rp.last_read_at IS NOT NULL AND rp.completed=0 ORDER BY rp.last_read_at DESC LIMIT 1`
+  const user = await requireUser();
+  const uid = user.id;
+
+  const totals = await get(
+    `SELECT
+       (SELECT COUNT(*) FROM subjects WHERE user_id=?) AS subjects,
+       (SELECT COUNT(*) FROM courses c JOIN subjects s ON s.id=c.subject_id WHERE s.user_id=?) AS courses,
+       (SELECT COUNT(*) FROM lessons l JOIN courses c ON c.id=l.course_id JOIN subjects s ON s.id=c.subject_id WHERE s.user_id=?) AS lessons,
+       (SELECT COUNT(*) FROM reading_progress rp JOIN lessons l ON l.id=rp.lesson_id JOIN courses c ON c.id=l.course_id JOIN subjects s ON s.id=c.subject_id WHERE rp.user_id=? AND s.user_id=? AND rp.completed=1) AS completed,
+       (SELECT COUNT(*) FROM bookmarks b JOIN lessons l ON l.id=b.lesson_id JOIN courses c ON c.id=l.course_id JOIN subjects s ON s.id=c.subject_id WHERE b.user_id=? AND s.user_id=?) AS bookmarks`,
+    uid,
+    uid,
+    uid,
+    uid,
+    uid,
+    uid,
+    uid
+  );
+
+  const continueRow = await get(
+    `${lessonCardSql()} WHERE s.user_id=? AND rp.last_read_at IS NOT NULL AND COALESCE(rp.completed,0)=0
+     ORDER BY rp.last_read_at DESC LIMIT 1`,
+    uid
   );
   const fallback = continueRow
     ? null
-    : get(`${LESSON_CARD} WHERE COALESCE(rp.completed,0)=0 ORDER BY l.created_at DESC LIMIT 1`);
-  const recentLessons = all(`${LESSON_CARD} ORDER BY l.created_at DESC, l.id DESC LIMIT 6`).map(bool);
-  const recentCourses = all(`${COURSE_SELECT} ORDER BY c.created_at DESC, c.id DESC LIMIT 4`);
-  const activity = all(
-    "SELECT read_at FROM reading_history WHERE read_at >= datetime('now','-8 days') ORDER BY read_at"
+    : await get(
+        `${lessonCardSql()} WHERE s.user_id=? AND COALESCE(rp.completed,0)=0
+         ORDER BY l.created_at DESC LIMIT 1`,
+        uid
+      );
+
+  const recentLessons = (
+    await all(`${lessonCardSql()} WHERE s.user_id=? ORDER BY l.created_at DESC, l.id DESC LIMIT 6`, uid)
+  ).map(bool);
+  const recentCourses = await all(
+    `${courseSelectSql()} WHERE s.user_id=? ORDER BY c.created_at DESC, c.id DESC LIMIT 4`,
+    uid
+  );
+  const activity = (
+    await all(
+      "SELECT read_at FROM reading_history WHERE user_id=? AND read_at >= datetime('now','-8 days') ORDER BY read_at",
+      uid
+    )
   ).map((r) => r.read_at);
-  const settings = Object.fromEntries(all("SELECT key, value FROM settings").map((r) => [r.key, r.value]));
+  const settings = Object.fromEntries(
+    (await all("SELECT key, value FROM user_settings WHERE user_id=?", uid)).map((r) => [r.key, r.value])
+  );
+
   return ok({
     totals,
     continue: bool(continueRow || fallback),
@@ -36,10 +68,18 @@ export const GET = handler(async () => {
 
 /** Reorder lessons in a course: { order: [lessonId, ...] } */
 export const PUT = handler(async (req) => {
+  const user = await requireUser();
   const b = await body(req);
-  (Array.isArray(b.order) ? b.order : []).forEach((id, i) =>
-    run("UPDATE lessons SET position=? WHERE id=?", i, Number(id))
-  );
+  const order = Array.isArray(b.order) ? b.order.slice(0, 500) : [];
+  for (let i = 0; i < order.length; i++) {
+    await run(
+      `UPDATE lessons SET position=? WHERE id=? AND course_id IN (
+         SELECT c.id FROM courses c JOIN subjects s ON s.id=c.subject_id WHERE s.user_id=?
+       )`,
+      i,
+      Number(order[i]),
+      user.id
+    );
+  }
   return ok({ ok: true });
 });
-

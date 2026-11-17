@@ -12,6 +12,7 @@ function setCookie(k, v) {
 }
 
 export default function Providers({ initial, children }) {
+  const [user, setUser] = useState(initial.user || null);
   const [locale, setLocaleState] = useState(initial.locale);
   const [theme, setThemeState] = useState(initial.theme);
   const [fontSize, setFontSizeState] = useState(initial.fontSize);
@@ -55,6 +56,14 @@ export default function Providers({ initial, children }) {
     persist("docFont", v);
   }, [persist]);
 
+  const logout = useCallback(async () => {
+    try {
+      await api("/auth/logout", { method: "POST" });
+    } catch {}
+    setUser(null);
+    window.location.href = "/login";
+  }, []);
+
   useEffect(() => {
     document.documentElement.style.setProperty("--reader-size", `${fontSize}px`);
   }, [fontSize]);
@@ -73,6 +82,9 @@ export default function Providers({ initial, children }) {
 
   const value = useMemo(
     () => ({
+      user,
+      setUser,
+      logout,
       t,
       locale,
       setLocale,
@@ -88,7 +100,7 @@ export default function Providers({ initial, children }) {
       setFocus,
       toast,
     }),
-    [t, locale, setLocale, theme, setTheme, fontSize, setFontSize, width, setWidth, docFont, setDocFont, focus, toast]
+    [user, logout, t, locale, setLocale, theme, setTheme, fontSize, setFontSize, width, setWidth, docFont, setDocFont, focus, toast]
   );
 
   const Icon = { success: CheckCircle2, error: AlertCircle, info: Info };

@@ -1,6 +1,7 @@
 import { all } from "@/lib/db";
 import { handler, ok } from "@/lib/api";
-import { LESSON_CARD, COURSE_SELECT, bool } from "@/lib/repo";
+import { lessonCardSql, courseSelectSql, bool } from "@/lib/repo";
+import { requireUser } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -20,28 +21,46 @@ function snippet(text, q) {
 }
 
 export const GET = handler(async (req) => {
+  const user = await requireUser();
+  const uid = user.id;
   const q = (new URL(req.url).searchParams.get("q") || "").trim().slice(0, 100);
   if (!q) return ok({ q, subjects: [], courses: [], lessons: [] });
   const like = `%${esc(q)}%`;
-  const subjects = all(
-    "SELECT * FROM subjects WHERE name LIKE ? ESCAPE '\\' OR description LIKE ? ESCAPE '\\' ORDER BY position LIMIT 20",
-    like, like
+
+  const subjects = await all(
+    `SELECT * FROM subjects WHERE user_id=? AND (name LIKE ? ESCAPE '\\' OR description LIKE ? ESCAPE '\\')
+     ORDER BY position LIMIT 20`,
+    uid,
+    like,
+    like
   );
-  const courses = all(
-    `${COURSE_SELECT} WHERE c.title LIKE ? ESCAPE '\\' OR c.description LIKE ? ESCAPE '\\' ORDER BY c.position LIMIT 30`,
-    like, like
+  const courses = await all(
+    `${courseSelectSql()} WHERE s.user_id=? AND (c.title LIKE ? ESCAPE '\\' OR c.description LIKE ? ESCAPE '\\')
+     ORDER BY c.position LIMIT 30`,
+    uid,
+    like,
+    like
   );
-  const lessons = all(
-    `SELECT x.*, l2.content_text FROM (${LESSON_CARD}) x JOIN lessons l2 ON l2.id=x.id
-     WHERE l2.title LIKE ? ESCAPE '\\' OR l2.description LIKE ? ESCAPE '\\' OR l2.tags LIKE ? ESCAPE '\\'
-        OR l2.content_text LIKE ? ESCAPE '\\'
-     ORDER BY (l2.title LIKE ? ESCAPE '\\') DESC, x.updated_at DESC LIMIT 50`,
-    like, like, like, like, like
+  const lessons = (
+    await all(
+      `SELECT x.*, l2.content_text FROM (${lessonCardSql()}) x JOIN lessons l2 ON l2.id=x.id
+       WHERE x.user_id=? AND (
+         l2.title LIKE ? ESCAPE '\\' OR l2.description LIKE ? ESCAPE '\\'
+         OR l2.tags LIKE ? ESCAPE '\\' OR l2.content_text LIKE ? ESCAPE '\\'
+       )
+       ORDER BY (l2.title LIKE ? ESCAPE '\\') DESC, x.updated_at DESC LIMIT 50`,
+      uid,
+      like,
+      like,
+      like,
+      like,
+      like
+    )
   ).map((r) => {
     const { content_text, ...rest } = bool(r);
     const inTitle = r.title.toLowerCase().includes(q.toLowerCase());
     return { ...rest, snippet: inTitle ? "" : snippet(content_text, q) || snippet(r.description, q) };
   });
+
   return ok({ q, subjects, courses, lessons });
 });
-

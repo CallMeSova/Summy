@@ -1,16 +1,16 @@
-import { all, get, run, tx } from "@/lib/db";
+import { get, run, tx } from "@/lib/db";
 import { handler, ok, body, str, intId, ApiError } from "@/lib/api";
 import { getCourse, lessonsOfCourse, nextPosition, bool } from "@/lib/repo";
-import { removeLessonFiles } from "@/lib/files";
+import { requireUser } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
 export const GET = handler(async (_req, { params }) => {
+  const user = await requireUser();
   const id = intId((await params).id);
-  const course = getCourse(id);
+  const course = await getCourse(user.id, id);
   if (!course) throw new ApiError(404, "Course not found");
-  const lessons = lessonsOfCourse(id).map(bool);
-  // the lesson to resume: last read & unfinished, else first unfinished, else first
+  const lessons = (await lessonsOfCourse(user.id, id)).map(bool);
   const resume =
     [...lessons]
       .filter((l) => l.last_read_at && !l.completed)
@@ -22,8 +22,13 @@ export const GET = handler(async (_req, { params }) => {
 });
 
 export const PATCH = handler(async (req, { params }) => {
+  const user = await requireUser();
   const id = intId((await params).id);
-  const cur = get("SELECT * FROM courses WHERE id=?", id);
+  const cur = await get(
+    "SELECT c.* FROM courses c JOIN subjects s ON s.id=c.subject_id WHERE c.id=? AND s.user_id=?",
+    id,
+    user.id
+  );
   if (!cur) throw new ApiError(404, "Course not found");
   const b = await body(req);
   const title = b.title !== undefined ? str(b.title, { field: "title", required: true, max: 160 }) : cur.title;
@@ -32,23 +37,33 @@ export const PATCH = handler(async (req, { params }) => {
   let position = cur.position;
   if (b.subject_id !== undefined && Number(b.subject_id) !== cur.subject_id) {
     subjectId = intId(b.subject_id, "subject_id");
-    if (!get("SELECT 1 FROM subjects WHERE id=?", subjectId)) throw new ApiError(404, "Subject not found");
-    position = nextPosition("courses", "subject_id", subjectId); // move
+    if (!(await get("SELECT 1 FROM subjects WHERE id=? AND user_id=?", subjectId, user.id))) {
+      throw new ApiError(404, "Subject not found");
+    }
+    position = await nextPosition("courses", "subject_id", subjectId);
   }
-  run(
+  await run(
     "UPDATE courses SET title=?, description=?, subject_id=?, position=?, updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id=?",
-    title, description, subjectId, position, id
+    title,
+    description,
+    subjectId,
+    position,
+    id
   );
-  return ok(getCourse(id));
+  return ok(await getCourse(user.id, id));
 });
 
 export const DELETE = handler(async (_req, { params }) => {
+  const user = await requireUser();
   const id = intId((await params).id);
-  const files = all(
-    "SELECT a.stored_name FROM attachments a JOIN lessons l ON l.id=a.lesson_id WHERE l.course_id=?", id
+  const cur = await get(
+    "SELECT c.id FROM courses c JOIN subjects s ON s.id=c.subject_id WHERE c.id=? AND s.user_id=?",
+    id,
+    user.id
   );
-  tx(() => run("DELETE FROM courses WHERE id=?", id));
-  removeLessonFiles(files);
+  if (!cur) throw new ApiError(404, "Course not found");
+  await tx(async () => {
+    await run("DELETE FROM courses WHERE id=?", id);
+  });
   return ok({ ok: true });
 });
-

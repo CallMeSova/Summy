@@ -128,7 +128,7 @@
 .lesson-meta { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
 
 /* Forms / editor */
-.form-card { max-width: 920px; }
+.form-card { max-width: 1080px; }
 .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 .form-grid .full { grid-column: 1 / -1; }
 .source-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
@@ -146,24 +146,27 @@
   text-align: center; background: var(--bg-subtle); transition: border-color .15s, background .15s;
   cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 6px;
 }
+.md-dropzone {
+  padding: 26px 20px;
+}
 .dropzone:hover, .dropzone.over { border-color: var(--text); background: var(--surface-2); }
 .dropzone.invalid { border-color: var(--danger); }
 .dropzone svg { color: var(--muted); }
 .file-pill { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg-subtle); margin-top: 10px; }
-.editor { border: 1px solid var(--border); border-radius: var(--r-card); overflow: hidden; background: var(--surface); }
+.editor { border: 1px solid var(--border); border-radius: var(--r-card); overflow: hidden; background: var(--surface); display: flex; flex-direction: column; }
 .editor:focus-within { border-color: var(--text); }
-.editor-bar { display: flex; flex-wrap: wrap; gap: 2px; padding: 6px; border-bottom: 1px solid var(--border); background: var(--bg-subtle); position: sticky; top: 56px; z-index: 5; }
+.editor-bar { display: flex; flex-wrap: wrap; gap: 2px; padding: 8px 10px; border-bottom: 1px solid var(--border); background: var(--bg-subtle); position: relative; z-index: 2; flex: none; }
 .editor-bar .sep { width: 1px; background: var(--border); margin: 4px 4px; }
 .editor-bar button { width: 30px; height: 30px; display: grid; place-items: center; border: 0; background: transparent; border-radius: 5px; color: var(--muted); }
 .editor-bar button:hover:not(:disabled) { background: var(--surface-2); color: var(--text); }
 .editor-bar button.on { background: var(--surface-2); color: var(--primary); }
 .editor-bar button:disabled { opacity: .35; }
-.editor-area { padding: 20px 24px; min-height: 340px; }
-.editor-area .ProseMirror { outline: none; min-height: 300px; }
+.editor-area { padding: 20px 24px; min-height: 380px; max-height: 620px; overflow-y: auto; }
+.editor-area .ProseMirror { outline: none; min-height: 340px; }
 .ProseMirror p.is-editor-empty:first-child::before { content: attr(data-placeholder); color: var(--muted); float: left; height: 0; pointer-events: none; }
 .md-split { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
-.md-split .textarea { min-height: 380px; font-family: var(--font-code), var(--doc-thai-font), monospace; font-size: 13.5px; line-height: 1.75; }
-.md-preview { border: 1px solid var(--border); border-radius: var(--r-card); padding: 18px 22px; max-height: 540px; overflow: auto; background: var(--surface); }
+.md-split .textarea { min-height: 460px; font-family: var(--font-code), var(--doc-thai-font), monospace; font-size: 13.5px; line-height: 1.75; }
+.md-preview { border: 1px solid var(--border); border-radius: var(--r-card); padding: 18px 22px; min-height: 460px; max-height: 640px; overflow: auto; background: var(--surface); }
 .form-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 8px; padding-top: 16px; border-top: 1px solid var(--border); }
 
 /* ============ Long-Form Documentation Prose (nextjs.org/docs + Looped Thai) ============ */
@@ -505,6 +508,17 @@
 .steps i { width: 32px; height: 4px; border-radius: 99px; background: var(--border); transition: all .25s; }
 .steps i.on { background: var(--text); width: 48px; }
 .welcome .card h3 { margin-bottom: 4px; }
+.auth-alert {
+  padding: 10px 12px; border-radius: 6px; border: 1px solid rgba(229, 72, 77, .3);
+  background: rgba(229, 72, 77, .08); color: var(--danger); font-size: 13px;
+}
+.auth-setup-hint {
+  padding: 10px 12px; border-radius: 6px; border: 1px solid var(--border);
+  background: var(--bg-subtle); display: flex; flex-direction: column; gap: 4px;
+}
+.auth-setup-hint code {
+  font-family: var(--font-code); font-size: 11.5px; color: var(--text); word-break: break-all;
+}
 
 /* ============ Responsive ============ */
 @media (max-width: 1180px) {
@@ -534,7 +548,6 @@
   .lesson-item { flex-wrap: wrap; }
   .lesson-meta { justify-content: flex-start; width: 100%; padding-left: 44px; }
   .course-hero { flex-direction: column; align-items: flex-start; }
-  .editor-bar { top: 56px; }
 }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }

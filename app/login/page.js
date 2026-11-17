@@ -1,0 +1,133 @@
+"use client";
+import { Suspense, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Languages, Terminal } from "lucide-react";
+import { Logo } from "@/components/Shell";
+import { useApp } from "@/components/Providers";
+import { api } from "@/lib/client";
+
+function GoogleIcon() {
+  return (
+    <svg width="17" height="17" viewBox="0 0 24 24" aria-hidden="true">
+      <path
+        fill="#4285F4"
+        d="M23.49 12.27c0-.79-.07-1.54-.19-2.27H12v4.51h6.47c-.29 1.48-1.14 2.73-2.4 3.58v3h3.86c2.26-2.09 3.56-5.17 3.56-8.82Z"
+      />
+      <path
+        fill="#34A853"
+        d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.86-3c-1.08.72-2.45 1.16-4.07 1.16-3.13 0-5.78-2.11-6.73-4.96H1.29v3.09C3.26 21.3 7.31 24 12 24Z"
+      />
+      <path
+        fill="#FBBC05"
+        d="M5.27 14.29c-.25-.72-.38-1.49-.38-2.29s.13-1.57.38-2.29V6.62H1.29a11.99 11.99 0 0 0 0 10.76l3.98-3.09Z"
+      />
+      <path
+        fill="#EA4335"
+        d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.31 0 3.26 2.7 1.29 6.62l3.98 3.09c.95-2.85 3.6-4.96 6.73-4.96Z"
+      />
+    </svg>
+  );
+}
+
+function LoginInner() {
+  const { user, setUser, t, locale, setLocale } = useApp();
+  const router = useRouter();
+  const sp = useSearchParams();
+  const errCode = sp.get("error");
+  const [meta, setMeta] = useState({ googleConfigured: true, devLoginAvailable: false });
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (user) router.replace("/");
+  }, [user, router]);
+
+  useEffect(() => {
+    api("/auth/me")
+      .then((d) => {
+        if (d.user) {
+          setUser(d.user);
+          router.replace("/");
+        } else {
+          setMeta({
+            googleConfigured: d.googleConfigured,
+            devLoginAvailable: d.devLoginAvailable,
+          });
+        }
+      })
+      .catch(() => {});
+  }, [router, setUser]);
+
+  async function devLogin() {
+    setBusy(true);
+    try {
+      const d = await api("/auth/dev", { method: "POST" });
+      setUser(d.user);
+      router.replace("/");
+    } catch {
+      setBusy(false);
+    }
+  }
+
+  const callbackUrl =
+    typeof window !== "undefined"
+      ? `${window.location.origin}/api/auth/callback/google`
+      : "http://localhost:3000/api/auth/callback/google";
+
+  return (
+    <div className="welcome">
+      <button
+        type="button"
+        className="btn btn-ghost btn-sm"
+        style={{ position: "fixed", top: 16, right: 16 }}
+        onClick={() => setLocale(locale === "th" ? "en" : "th")}
+      >
+        <Languages size={16} /> {locale === "th" ? "English" : "ไทย"}
+      </button>
+
+      <Logo size={48} />
+      <h1>{t("auth.title")}</h1>
+      <p className="muted sub">{t("auth.subtitle")}</p>
+
+      <div className="card stack" style={{ gap: 14 }}>
+        {errCode && (
+          <div className="auth-alert">
+            {errCode === "google_not_configured" ? t("auth.errNotConfigured") : t("auth.errCancelled")}
+          </div>
+        )}
+
+        <a href="/api/auth/google" className="btn btn-primary btn-lg" style={{ width: "100%" }}>
+          <GoogleIcon />
+          <span>{t("auth.googleBtn")}</span>
+        </a>
+
+        {meta.devLoginAvailable && (
+          <button
+            type="button"
+            className="btn btn-secondary"
+            style={{ width: "100%" }}
+            disabled={busy}
+            onClick={devLogin}
+          >
+            <Terminal size={15} />
+            <span>{t("auth.devBtn")}</span>
+          </button>
+        )}
+
+        {!meta.googleConfigured && (
+          <div className="auth-setup-hint">
+            <div className="small muted">{t("auth.setupHint")}</div>
+            <code>{callbackUrl}</code>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense>
+      <LoginInner />
+    </Suspense>
+  );
+}

@@ -8,6 +8,7 @@ import {
 } from "next/font/google";
 import Providers from "@/components/Providers";
 import Shell from "@/components/Shell";
+import { getSessionUser } from "@/lib/auth";
 import "katex/dist/katex.min.css";
 import "./globals.css";
 import "./pages.css";
@@ -48,6 +49,7 @@ export default async function RootLayout({ children }) {
   const docFont = pick(c.get("summy_df")?.value, ["looped", "sarabun", "sans"], "looped");
   const fs = Number(c.get("summy_fs")?.value);
   const fontSize = fs >= 14 && fs <= 24 ? fs : 17;
+  const user = await getSessionUser();
 
   return (
     <html
@@ -59,7 +61,7 @@ export default async function RootLayout({ children }) {
       suppressHydrationWarning
     >
       <body>
-        <Providers initial={{ locale, theme, fontSize, width, docFont }}>
+        <Providers initial={{ locale, theme, fontSize, width, docFont, user }}>
           <Shell>{children}</Shell>
         </Providers>
       </body>

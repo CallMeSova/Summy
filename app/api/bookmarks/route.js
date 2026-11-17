@@ -1,16 +1,16 @@
 import { all } from "@/lib/db";
 import { handler, ok } from "@/lib/api";
-import { LESSON_CARD, bool } from "@/lib/repo";
+import { lessonCardSql, bool } from "@/lib/repo";
+import { requireUser } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
 export const GET = handler(async () => {
-  const rows = all(
-    `${LESSON_CARD} JOIN bookmarks bm ON bm.lesson_id=l.id ORDER BY bm.created_at DESC`.replace(
-      "FROM lessons l\nJOIN courses",
-      "FROM lessons l\nJOIN courses"
-    )
+  const user = await requireUser();
+  const rows = await all(
+    `${lessonCardSql()} JOIN bookmarks bm ON bm.lesson_id=l.id AND bm.user_id=s.user_id
+     WHERE s.user_id=? ORDER BY bm.created_at DESC`,
+    user.id
   );
   return ok(rows.map(bool));
 });
-

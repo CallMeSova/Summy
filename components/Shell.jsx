@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard, Library, Search, Bookmark, History, Settings, PlusCircle, Menu, Moon, Sun,
-  Languages, Command, CornerDownLeft, BookOpen, FolderOpen, Monitor, HardDrive,
+  Languages, Command, CornerDownLeft, BookOpen, FolderOpen, Monitor, LogOut,
 } from "lucide-react";
 import { useApp } from "./Providers";
 import { api } from "@/lib/client";
@@ -123,7 +123,7 @@ function Palette({ open, onClose }) {
 }
 
 export default function Shell({ children }) {
-  const { t, locale, setLocale, theme, setTheme, focus, setFocus } = useApp();
+  const { user, logout, t, locale, setLocale, theme, setTheme, focus, setFocus } = useApp();
   const path = usePathname();
   const router = useRouter();
   const [drawer, setDrawer] = useState(false);
@@ -132,6 +132,12 @@ export default function Shell({ children }) {
 
   useEffect(() => { setDrawer(false); }, [path]);
   useEffect(() => { if (!path.startsWith("/lessons/")) setFocus(false); }, [path, setFocus]);
+  useEffect(() => {
+    if (!user && path !== "/login") {
+      router.replace("/login");
+    }
+  }, [user, path, router]);
+
   useEffect(() => {
     const onKey = (e) => {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
@@ -143,10 +149,12 @@ export default function Shell({ children }) {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-  if (path === "/welcome") return <div className="welcome-root">{children}</div>;
+  if (path === "/login" || path === "/welcome") return <div className="welcome-root">{children}</div>;
+  if (!user) return null;
 
   const ThemeIcon = theme === "dark" ? Moon : theme === "light" ? Sun : Monitor;
   const nextTheme = { light: "dark", dark: "system", system: "light" }[theme];
+  const initialLetter = (user.name || user.email || "U")[0].toUpperCase();
 
   function toggleMenu() {
     if (typeof window !== "undefined" && window.innerWidth <= 1024) {
@@ -189,9 +197,26 @@ export default function Shell({ children }) {
           </div>
         </nav>
         <div className="sidebar-foot">
-          <div className="foot-card">
-            <HardDrive size={14} />
-            <span>{t("settings.storage")}</span>
+          <div className="user-card">
+            {user.avatar ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={user.avatar} alt="" className="user-avatar" referrerPolicy="no-referrer" />
+            ) : (
+              <span className="user-avatar user-initial">{initialLetter}</span>
+            )}
+            <div className="user-info">
+              <div className="user-name clamp-1">{user.name || user.email}</div>
+              <div className="user-email clamp-1">{user.email}</div>
+            </div>
+            <button
+              type="button"
+              className="icon-btn sm"
+              onClick={logout}
+              title={t("auth.logout")}
+              aria-label={t("auth.logout")}
+            >
+              <LogOut size={15} />
+            </button>
           </div>
         </div>
       </aside>

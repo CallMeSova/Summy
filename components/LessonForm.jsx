@@ -43,6 +43,8 @@ export default function LessonForm({ lessonId, defaultCourseId }) {
   const [rich, setRich] = useState({ json: null, text: "" });
   const [md, setMd] = useState("");
   const [mdDebounced, setMdDebounced] = useState("");
+  const [mdFileName, setMdFileName] = useState("");
+  const [mdOver, setMdOver] = useState(false);
   const [mdMobileTab, setMdMobileTab] = useState("write");
   const [file, setFile] = useState(null);
   const [over, setOver] = useState(false);
@@ -106,6 +108,7 @@ export default function LessonForm({ lessonId, defaultCourseId }) {
     if (f.size > 5 * 1024 * 1024) return setErrors((x) => ({ ...x, md: t("lesson.errMdType") }));
     const text = await f.text();
     setMd(text);
+    setMdFileName(`${f.name} · ${fmtSize(f.size)}`);
     setErrors((x) => ({ ...x, md: undefined }));
     if (!title.trim()) {
       const h1 = text.match(/^#\s+(.+)$/m);
@@ -220,15 +223,47 @@ export default function LessonForm({ lessonId, defaultCourseId }) {
         {type === "richtext" && <RichEditor value={rich.json} onChange={setRich} />}
 
         {type === "markdown" && (
-          <div className="stack" style={{ gap: 10 }}>
-            <div className="row" style={{ flexWrap: "wrap" }}>
-              <button type="button" className="btn btn-secondary btn-sm" onClick={() => mdFile.current?.click()}><FileUp size={15} />{t("lesson.pickMd")}</button>
-              <input ref={mdFile} type="file" accept=".md,.markdown,.txt,text/markdown,text/plain" hidden onChange={(e) => { pickMd(e.target.files?.[0]); e.target.value = ""; }} />
-              <div className="seg show-sm-only" style={{ marginLeft: "auto" }}>
+          <div className="stack" style={{ gap: 12 }}>
+            <div
+              className={`dropzone md-dropzone ${mdOver ? "over" : ""}`}
+              onClick={() => mdFile.current?.click()}
+              onDragOver={(e) => { e.preventDefault(); setMdOver(true); }}
+              onDragLeave={() => setMdOver(false)}
+              onDrop={(e) => { e.preventDefault(); setMdOver(false); pickMd(e.dataTransfer.files?.[0]); }}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && mdFile.current?.click()}
+            >
+              <FileUp size={28} />
+              <b>{t("lesson.dropMd")}</b>
+              <span className="muted small">{t("lesson.dropMdSub")}</span>
+              <span className="btn btn-secondary btn-sm" style={{ marginTop: 4 }}>
+                <FileUp size={14} /> {t("lesson.pickMd")}
+              </span>
+              <input
+                ref={mdFile}
+                type="file"
+                accept=".md,.markdown,.txt,text/markdown,text/plain"
+                hidden
+                onChange={(e) => { pickMd(e.target.files?.[0]); e.target.value = ""; }}
+              />
+            </div>
+
+            {mdFileName && (
+              <div className="file-pill" style={{ marginTop: 0 }}>
+                <FileText size={16} />
+                <span className="grow">{mdFileName}</span>
+                <button type="button" className="icon-btn sm" onClick={() => setMdFileName("")} aria-label={t("common.close")}><X size={14} /></button>
+              </div>
+            )}
+
+            <div className="row show-sm-only" style={{ justifyContent: "flex-end" }}>
+              <div className="seg">
                 <button type="button" className={mdMobileTab === "write" ? "on" : ""} onClick={() => setMdMobileTab("write")}><Pencil size={14} />{t("lesson.write")}</button>
                 <button type="button" className={mdMobileTab === "preview" ? "on" : ""} onClick={() => setMdMobileTab("preview")}><Eye size={14} />{t("lesson.preview")}</button>
               </div>
             </div>
+
             <div className="md-split">
               <textarea className={`textarea ${errors.md ? "invalid" : ""} ${mdMobileTab === "preview" ? "md-hide" : ""}`} value={md} onChange={(e) => setMd(e.target.value)} placeholder={t("lesson.mdPaste")} spellCheck={false} />
               <div className={`md-preview ${mdMobileTab === "write" ? "md-hide" : ""}`}>

@@ -1,20 +1,21 @@
-import fs from "node:fs";
-import path from "node:path";
-import os from "node:os";
 import JSZip from "jszip";
-import { closeDb, getDb, DB_PATH, UPLOAD_DIR, BACKUP_DIR } from "@/lib/db";
-import { handler, ok, ApiError } from "@/lib/api";
+import { run, tx } from "@/lib/db";
+import { handler, ok, ApiError, str } from "@/lib/api";
+import { isPdf, safeStoredName, MAX_PDF_BYTES } from "@/lib/files";
+import { requireUser } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
-const REQUIRED_TABLES = ["subjects", "courses", "lessons", "bookmarks", "reading_progress", "attachments"];
-const MAX_BACKUP = 1024 * 1024 * 1024;
+const MAX_BACKUP = 100 * 1024 * 1024; // 100 MB max upload
 
 export const POST = handler(async (req) => {
+  const user = await requireUser();
+  const uid = user.id;
+
   const fd = await req.formData();
   const file = fd.get("file");
   if (!file || typeof file === "string") throw new ApiError(400, "Backup file is required");
-  if (file.size > MAX_BACKUP) throw new ApiError(413, "Backup is too large");
+  if (file.size > MAX_BACKUP) throw new ApiError(413, "Backup is too large (max 100 MB)");
 
   let zip;
   try {
@@ -22,63 +23,134 @@ export const POST = handler(async (req) => {
   } catch {
     throw new ApiError(400, "Not a valid ZIP file");
   }
+
   const manifestFile = zip.file("manifest.json");
-  const dbFile = zip.file("summy.db");
-  if (!manifestFile || !dbFile) throw new ApiError(400, "Not a Summy backup");
-  let manifest;
+  const libraryFile = zip.file("library.json");
+  if (!manifestFile || !libraryFile) {
+    throw new ApiError(400, "Invalid Summy backup archive");
+  }
+
+  let manifest, libData;
   try {
     manifest = JSON.parse(await manifestFile.async("string"));
+    libData = JSON.parse(await libraryFile.async("string"));
   } catch {
-    throw new ApiError(400, "Corrupt manifest");
+    throw new ApiError(400, "Corrupt backup JSON");
   }
-  if (manifest.app !== "summy") throw new ApiError(400, "Not a Summy backup");
-
-  const dbBuf = await dbFile.async("nodebuffer");
-  if (dbBuf.subarray(0, 15).toString("latin1") !== "SQLite format 3") {
-    throw new ApiError(400, "Database in backup is invalid");
+  if (manifest?.app !== "summy" || !Array.isArray(libData?.subjects)) {
+    throw new ApiError(400, "Not a valid Summy backup");
   }
 
-  // validate in a temp database before touching the live one
-  const tmp = path.join(os.tmpdir(), `summy-restore-${Date.now()}.db`);
-  fs.writeFileSync(tmp, dbBuf);
-  try {
-    const { DatabaseSync } = process.getBuiltinModule("node:sqlite");
-    const t = new DatabaseSync(tmp);
-    try {
-      const names = t.prepare("SELECT name FROM sqlite_master WHERE type='table'").all().map((r) => r.name);
-      for (const n of REQUIRED_TABLES) if (!names.includes(n)) throw new ApiError(400, "Backup schema is invalid");
-      const chk = t.prepare("PRAGMA integrity_check").get();
-      if (Object.values(chk)[0] !== "ok") throw new ApiError(400, "Backup database is corrupted");
-    } finally {
-      t.close();
+  // Pre-load and validate any PDF blobs before modifying the user's library
+  const pdfBlobs = new Map();
+  for (const att of libData.attachments || []) {
+    if (!att?.zip_path || typeof att.zip_path !== "string" || !att.zip_path.startsWith("uploads/")) continue;
+    const entry = zip.file(att.zip_path);
+    if (!entry) continue;
+    const buf = await entry.async("nodebuffer");
+    if (buf.length > MAX_PDF_BYTES || !isPdf(buf)) {
+      throw new ApiError(400, "Backup contains an invalid PDF attachment");
     }
-  } catch (e) {
-    fs.rmSync(tmp, { force: true });
-    if (e instanceof ApiError) throw e;
-    throw new ApiError(400, "Backup database cannot be read");
+    pdfBlobs.set(att.zip_path, buf);
   }
 
-  // snapshot current data first so a failed restore can be recovered by hand
-  const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
-  const safety = path.join(BACKUP_DIR, `pre-restore-${stamp}.db`);
-  try {
-    getDb().exec(`VACUUM INTO '${safety.replace(/'/g, "''")}'`);
-  } catch {}
+  await tx(async () => {
+    // Clear only this user's existing subjects (cascades to courses, lessons, attachments) & progress/bookmarks
+    await run("DELETE FROM bookmarks WHERE user_id=?", uid);
+    await run("DELETE FROM reading_progress WHERE user_id=?", uid);
+    await run("DELETE FROM reading_history WHERE user_id=?", uid);
+    await run("DELETE FROM subjects WHERE user_id=?", uid);
 
-  closeDb();
-  for (const ext of ["", "-wal", "-shm"]) fs.rmSync(DB_PATH + ext, { force: true });
-  fs.copyFileSync(tmp, DB_PATH);
-  fs.rmSync(tmp, { force: true });
+    const subjectIdMap = new Map();
+    const courseIdMap = new Map();
+    const lessonIdMap = new Map();
 
-  fs.rmSync(UPLOAD_DIR, { recursive: true, force: true });
-  fs.mkdirSync(UPLOAD_DIR, { recursive: true });
-  for (const [name, entry] of Object.entries(zip.files)) {
-    if (entry.dir || !name.startsWith("uploads/")) continue;
-    const base = path.basename(name);
-    if (!base || base !== name.slice("uploads/".length)) continue; // no nested/traversal paths
-    fs.writeFileSync(path.join(UPLOAD_DIR, base), await entry.async("nodebuffer"));
-  }
-  getDb(); // reopen
+    for (const s of (libData.subjects || []).slice(0, 500)) {
+      const name = str(s.name, { field: "subject.name", required: true, max: 120 });
+      const description = str(s.description, { max: 500 });
+      const color = /^#[0-9a-fA-F]{6}$/.test(s.color || "") ? s.color : "#0070F3";
+      const r = await run(
+        "INSERT INTO subjects (user_id, name, description, color, position) VALUES (?,?,?,?,?)",
+        uid,
+        name,
+        description,
+        color,
+        Number(s.position) || 0
+      );
+      subjectIdMap.set(Number(s.id), Number(r.lastInsertRowid));
+    }
+
+    for (const c of (libData.courses || []).slice(0, 2000)) {
+      const newSubjId = subjectIdMap.get(Number(c.subject_id));
+      if (!newSubjId) continue;
+      const title = str(c.title, { field: "course.title", required: true, max: 160 });
+      const description = str(c.description, { max: 1000 });
+      const r = await run(
+        "INSERT INTO courses (subject_id, title, description, position) VALUES (?,?,?,?)",
+        newSubjId,
+        title,
+        description,
+        Number(c.position) || 0
+      );
+      courseIdMap.set(Number(c.id), Number(r.lastInsertRowid));
+    }
+
+    for (const l of (libData.lessons || []).slice(0, 5000)) {
+      const newCourseId = courseIdMap.get(Number(l.course_id));
+      if (!newCourseId) continue;
+      if (!["richtext", "markdown", "pdf"].includes(l.content_type)) continue;
+      const title = str(l.title, { field: "lesson.title", required: true, max: 200 });
+      const description = str(l.description, { max: 1000 });
+      const tags = str(l.tags, { max: 300 });
+      const r = await run(
+        `INSERT INTO lessons (course_id, title, description, content_type, content_json, content_md, content_text, tags, position)
+         VALUES (?,?,?,?,?,?,?,?,?)`,
+        newCourseId,
+        title,
+        description,
+        l.content_type,
+        l.content_json ? String(l.content_json) : null,
+        l.content_md ? String(l.content_md) : null,
+        String(l.content_text || ""),
+        tags,
+        Number(l.position) || 0
+      );
+      lessonIdMap.set(Number(l.id), Number(r.lastInsertRowid));
+    }
+
+    for (const att of libData.attachments || []) {
+      const newLessonId = lessonIdMap.get(Number(att.lesson_id));
+      const buf = pdfBlobs.get(att.zip_path);
+      if (!newLessonId || !buf) continue;
+      await run(
+        "INSERT INTO attachments (lesson_id, original_name, stored_name, mime, size, data) VALUES (?,?,?,?,?,?)",
+        newLessonId,
+        String(att.original_name || "document.pdf").slice(0, 255),
+        safeStoredName(".pdf"),
+        "application/pdf",
+        buf.length,
+        buf
+      );
+    }
+
+    for (const bm of libData.bookmarks || []) {
+      const newLessonId = lessonIdMap.get(Number(bm.lesson_id));
+      if (!newLessonId) continue;
+      await run("INSERT OR IGNORE INTO bookmarks (user_id, lesson_id) VALUES (?,?)", uid, newLessonId);
+    }
+
+    for (const rp of libData.reading_progress || []) {
+      const newLessonId = lessonIdMap.get(Number(rp.lesson_id));
+      if (!newLessonId) continue;
+      await run(
+        "INSERT OR IGNORE INTO reading_progress (user_id, lesson_id, progress, completed) VALUES (?,?,?,?)",
+        uid,
+        newLessonId,
+        Math.max(0, Math.min(100, Number(rp.progress) || 0)),
+        rp.completed ? 1 : 0
+      );
+    }
+  });
+
   return ok({ ok: true });
 });
-
