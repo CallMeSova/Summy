@@ -2,13 +2,14 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { PenLine, FileText, FileType2, UploadCloud, FileUp, X, Eye, Pencil, Library } from "lucide-react";
+import { PenLine, FileText, FileType2, UploadCloud, FileUp, X, Eye, Pencil, Library, ClipboardCheck } from "lucide-react";
 import dynamic from "next/dynamic";
 import { useApp } from "./Providers";
 import { api, useFetch } from "@/lib/client";
 import { PageHeader, Breadcrumbs, EmptyState, Skeleton } from "./ui";
 import { MarkdownView } from "./content";
 import AiPromptTrigger from "./AiPromptTrigger";
+import QuizModal, { extractQuizFromMarkdown } from "./QuizModal";
 
 const RichEditor = dynamic(() => import("./content").then((m) => m.RichEditor), {
   ssr: false,
@@ -22,6 +23,31 @@ const SAMPLE_MERMAID = `\n\`\`\`mermaid
 flowchart LR
   A["ไฟล์เรียน (PDF / Slides)"] -->|"ใช้ AI แปลงด้วย Prompt"| B["ไฟล์สรุป (.md)"]
   B -->|"นำเข้าสู่ Summy"| C["อ่านสบายตา + กราฟ Mermaid"]
+\`\`\`\n`;
+
+const SAMPLE_QUIZ = `\n\`\`\`summy-quiz
+{
+  "mcq": [
+    {
+      "question": "ข้อใดคือจุดเด่นของ Finite Automaton (DFA)?",
+      "options": [
+        "ไม่มีหน่วยความจำชั่วคราว (No temporary memory)",
+        "ใช้หน่วยความจำแบบ Stack",
+        "ใช้หน่วยความจำแบบ Random Access",
+        "สามารถเปลี่ยนสถานะได้หลายทางพร้อมกันจากอินพุตเดียว",
+        "มีพลังการคำนวณเทียบเท่า Turing Machine"
+      ],
+      "answer": 0,
+      "explanation": "Finite Automaton ไม่มี temporary memory จึงจำข้อมูลได้จำกัดตามจำนวนสถานะที่มี"
+    }
+  ],
+  "short": [
+    {
+      "question": "จงอธิบายความแตกต่างหลักระหว่าง Computability และ Complexity",
+      "answer": "Computability ศึกษาว่าปัญหาใดสามารถคำนวณหรือหาคำตอบได้ (Decidable) ส่วน Complexity ศึกษาว่าปัญหาที่คำนวณได้นั้นต้องใช้ทรัพยากรเวลาและหน่วยความจำมากน้อยเพียงใด"
+    }
+  ]
+}
 \`\`\`\n`;
 
 function Err({ msg }) {
@@ -46,6 +72,7 @@ export default function LessonForm({ lessonId, defaultCourseId }) {
   const [mdFileName, setMdFileName] = useState("");
   const [mdOver, setMdOver] = useState(false);
   const [mdMobileTab, setMdMobileTab] = useState("write");
+  const [previewQuizOpen, setPreviewQuizOpen] = useState(false);
   const [file, setFile] = useState(null);
   const [over, setOver] = useState(false);
   const [errors, setErrors] = useState({});
@@ -119,6 +146,12 @@ export default function LessonForm({ lessonId, defaultCourseId }) {
   function insertSampleMermaid() {
     setMd((prev) => (prev ? `${prev.replace(/\s*$/, "\n")}${SAMPLE_MERMAID}` : SAMPLE_MERMAID.trimStart()));
   }
+
+  function insertSampleQuiz() {
+    setMd((prev) => (prev ? `${prev.replace(/\s*$/, "\n")}${SAMPLE_QUIZ}` : SAMPLE_QUIZ.trimStart()));
+  }
+
+  const { quiz: previewQuiz } = useMemo(() => extractQuizFromMarkdown(mdDebounced), [mdDebounced]);
 
   async function submit(e) {
     e.preventDefault();
@@ -218,6 +251,7 @@ export default function LessonForm({ lessonId, defaultCourseId }) {
 
         <AiPromptTrigger
           onInsertSample={type === "markdown" ? insertSampleMermaid : undefined}
+          onInsertQuizSample={type === "markdown" ? insertSampleQuiz : undefined}
         />
 
         {type === "richtext" && <RichEditor value={rich.json} onChange={setRich} />}
@@ -267,6 +301,14 @@ export default function LessonForm({ lessonId, defaultCourseId }) {
             <div className="md-split">
               <textarea className={`textarea ${errors.md ? "invalid" : ""} ${mdMobileTab === "preview" ? "md-hide" : ""}`} value={md} onChange={(e) => setMd(e.target.value)} placeholder={t("lesson.mdPaste")} spellCheck={false} />
               <div className={`md-preview ${mdMobileTab === "write" ? "md-hide" : ""}`}>
+                {previewQuiz && (
+                  <div className="quiz-preview-bar">
+                    <span>{t("quiz.previewDetected", { m: previewQuiz.mcq.length, s: previewQuiz.short.length })}</span>
+                    <button type="button" className="btn btn-primary btn-sm" onClick={() => setPreviewQuizOpen(true)}>
+                      <ClipboardCheck size={14} /> {t("quiz.openBtn", { n: previewQuiz.total })}
+                    </button>
+                  </div>
+                )}
                 {mdDebounced ? <MarkdownView source={mdDebounced} /> : <p className="muted">{t("lesson.preview")}</p>}
               </div>
             </div>
@@ -309,6 +351,12 @@ export default function LessonForm({ lessonId, defaultCourseId }) {
           <button className="btn btn-primary" disabled={busy}>{busy ? t("common.loading") : t("common.save")}</button>
         </div>
       </form>
+      <QuizModal
+        open={previewQuizOpen}
+        onClose={() => setPreviewQuizOpen(false)}
+        quiz={previewQuiz}
+        lessonTitle={title}
+      />
     </>
   );
 }

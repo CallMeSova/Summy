@@ -2,13 +2,14 @@
 import { use, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
-  ChevronLeft, ChevronRight, ChevronDown, Minus, Plus, Maximize2, Minimize2, Pencil, CheckCircle2, Check, ExternalLink, FileWarning, Type, ChevronsDownUp, ChevronsUpDown,
+  ChevronLeft, ChevronRight, ChevronDown, Minus, Plus, Maximize2, Minimize2, Pencil, CheckCircle2, Check, ExternalLink, FileWarning, Type, ChevronsDownUp, ChevronsUpDown, ClipboardCheck,
 } from "lucide-react";
 import dynamic from "next/dynamic";
 import { useApp } from "@/components/Providers";
 import { api, useFetch } from "@/lib/client";
 import { Breadcrumbs, BookmarkButton, TypeBadge, ErrorState, Skeleton, EmptyState } from "@/components/ui";
 import { MarkdownView } from "@/components/content";
+import QuizModal, { extractQuizFromMarkdown } from "@/components/QuizModal";
 
 const RichView = dynamic(() => import("@/components/content").then((m) => m.RichView), { ssr: false });
 
@@ -45,6 +46,7 @@ export default function Reader({ params }) {
   const [collapsedIds, setCollapsedIds] = useState({});
   const [activeToc, setActiveToc] = useState("");
   const [ready, setReady] = useState(0);
+  const [quizOpen, setQuizOpen] = useState(false);
   const restored = useRef(false);
   const saveTimer = useRef(null);
   const pending = useRef(null);
@@ -66,6 +68,7 @@ export default function Reader({ params }) {
     setProg(lesson.completed ? 100 : lesson.progress);
     setToc([]);
     setCollapsedIds({});
+    setQuizOpen(false);
     restored.current = false;
     window.scrollTo({ top: 0 });
     api(`/lessons/${lesson.id}/progress`, { method: "PUT", json: { open: true } }).catch(() => {});
@@ -128,6 +131,7 @@ export default function Reader({ params }) {
   const tocGroups = useMemo(() => buildTocGroups(toc), [toc]);
   const collapsibleGroups = useMemo(() => tocGroups.filter((g) => g.children.length > 0), [tocGroups]);
   const allCollapsed = collapsibleGroups.length > 0 && collapsibleGroups.every((g) => collapsedIds[g.id]);
+  const { quiz } = useMemo(() => extractQuizFromMarkdown(lesson?.content_md), [lesson?.content_md]);
 
   function toggleGroup(gid) {
     setCollapsedIds((prev) => ({ ...prev, [gid]: !prev[gid] }));
@@ -204,6 +208,20 @@ export default function Reader({ params }) {
               <span className="div" />
             </>
           )}
+          {quiz && (
+            <>
+              <button
+                type="button"
+                className="icon-btn sm quiz-trigger-btn"
+                onClick={() => setQuizOpen(true)}
+                title={t("quiz.openBtn", { n: quiz.total })}
+              >
+                <ClipboardCheck size={14} />
+                <span>{t("quiz.openBtn", { n: quiz.total })}</span>
+              </button>
+              <span className="div" />
+            </>
+          )}
           <BookmarkButton active={lesson.bookmarked} onClick={toggleBookmark} />
           <Link href={`/lessons/${id}/edit`} className="icon-btn sm" title={t("reader.edit")} aria-label={t("reader.edit")}><Pencil size={15} /></Link>
           <button className={`icon-btn sm ${focus ? "on" : ""}`} onClick={() => setFocus(!focus)} title={focus ? t("reader.exitFocus") : t("reader.focus")} aria-label={t("reader.focus")}>
@@ -243,6 +261,12 @@ export default function Reader({ params }) {
             <button className={`btn ${lesson.completed ? "btn-secondary" : "btn-primary"}`} onClick={toggleDone}>
               <Check size={16} />{lesson.completed ? t("reader.markUndone") : t("reader.markDone")}
             </button>
+            {quiz && (
+              <button type="button" className="btn btn-secondary" onClick={() => setQuizOpen(true)}>
+                <ClipboardCheck size={16} />
+                {t("quiz.openBtnFull", { m: quiz.mcq.length, s: quiz.short.length })}
+              </button>
+            )}
           </div>
         </article>
 
@@ -335,6 +359,13 @@ export default function Reader({ params }) {
           <Link href={`/lessons/${lesson.next.id}`} className="btn btn-primary btn-sm" title={lesson.next.title}><span className="hide-sm">{t("reader.next")}</span><ChevronRight size={15} /></Link>
         ) : <span className="btn btn-primary btn-sm" style={{ opacity: 0.35 }}><ChevronRight size={15} /></span>}
       </div>
+
+      <QuizModal
+        open={quizOpen}
+        onClose={() => setQuizOpen(false)}
+        quiz={quiz}
+        lessonTitle={lesson.title}
+      />
     </div>
   );
 }

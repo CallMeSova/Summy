@@ -131,8 +131,11 @@ export function renderMarkdown(src) {
     return token;
   };
 
+  // Strip ```summy-quiz or ```quiz JSON blocks from the reading prose (they are rendered via QuizModal)
+  let cleanedSrc = String(src).replace(/```(?:summy-quiz|quiz)[ \t]*\r?\n[\s\S]*?```/gi, "");
+
   // 1. Protect fenced code blocks (and turn ```mermaid into interactive diagram containers)
-  let text = String(src).replace(/```([a-zA-Z0-9_-]*)[ \t]*\r?\n([\s\S]*?)```/g, (full, lang, code) => {
+  let text = cleanedSrc.replace(/```([a-zA-Z0-9_-]*)[ \t]*\r?\n([\s\S]*?)```/g, (full, lang, code) => {
     const l = (lang || "").trim().toLowerCase();
     if (l === "mermaid") {
       const encoded = encodeURIComponent(code.trim());

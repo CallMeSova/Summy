@@ -1,6 +1,6 @@
 "use client";
 import { useMemo, useState } from "react";
-import { Copy, Check, SlidersHorizontal, Sparkles, GitBranch } from "lucide-react";
+import { Copy, Check, SlidersHorizontal, Sparkles, GitBranch, ClipboardCheck } from "lucide-react";
 import { Modal } from "./ui";
 import { useApp } from "./Providers";
 import { buildPdfToMdPrompt } from "@/lib/aiPrompt";
@@ -20,7 +20,7 @@ async function copyText(text) {
   document.body.removeChild(ta);
 }
 
-export default function AiPromptTrigger({ onInsertSample, compact = false }) {
+export default function AiPromptTrigger({ onInsertSample, onInsertQuizSample, compact = false }) {
   const { t, locale, toast } = useApp();
   const [copied, setCopied] = useState(false);
   const [open, setOpen] = useState(false);
@@ -28,6 +28,7 @@ export default function AiPromptTrigger({ onInsertSample, compact = false }) {
   const [detailLevel, setDetailLevel] = useState("complete");
   const [includeMermaid, setIncludeMermaid] = useState(true);
   const [citePages, setCitePages] = useState(true);
+  const [includeQuiz, setIncludeQuiz] = useState(true);
 
   const promptText = useMemo(
     () =>
@@ -36,8 +37,9 @@ export default function AiPromptTrigger({ onInsertSample, compact = false }) {
         detailLevel,
         includeMermaid,
         citePages,
+        includeQuiz,
       }),
-    [outputLang, detailLevel, includeMermaid, citePages]
+    [outputLang, detailLevel, includeMermaid, citePages, includeQuiz]
   );
 
   async function handleCopy() {
@@ -55,6 +57,14 @@ export default function AiPromptTrigger({ onInsertSample, compact = false }) {
             <Sparkles size={13} /> AI PDF → MD
           </span>
           {!compact && <span className="muted small">{t("prompt.barHint")}</span>}
+          <label className="prompt-check">
+            <input
+              type="checkbox"
+              checked={includeQuiz}
+              onChange={(e) => setIncludeQuiz(e.target.checked)}
+            />
+            <span>{t("prompt.includeQuizCheck")}</span>
+          </label>
         </div>
         <div className="row" style={{ gap: 6, flexWrap: "wrap" }}>
           <button type="button" className="btn btn-primary btn-sm" onClick={handleCopy}>
@@ -79,6 +89,17 @@ export default function AiPromptTrigger({ onInsertSample, compact = false }) {
             >
               <GitBranch size={14} />
               {t("prompt.insertMermaid")}
+            </button>
+          )}
+          {onInsertQuizSample && (
+            <button
+              type="button"
+              className="btn btn-ghost btn-sm"
+              onClick={onInsertQuizSample}
+              title={t("prompt.insertQuiz")}
+            >
+              <ClipboardCheck size={14} />
+              {t("prompt.insertQuiz")}
             </button>
           )}
         </div>
@@ -140,6 +161,26 @@ export default function AiPromptTrigger({ onInsertSample, compact = false }) {
                   onClick={() => setDetailLevel("exam")}
                 >
                   {t("prompt.optDetailExam")}
+                </button>
+              </div>
+            </div>
+
+            <div className="prompt-opt-row">
+              <span>{t("prompt.optQuiz")}</span>
+              <div className="seg">
+                <button
+                  type="button"
+                  className={includeQuiz ? "on" : ""}
+                  onClick={() => setIncludeQuiz(true)}
+                >
+                  {t("prompt.on")}
+                </button>
+                <button
+                  type="button"
+                  className={!includeQuiz ? "on" : ""}
+                  onClick={() => setIncludeQuiz(false)}
+                >
+                  {t("prompt.off")}
                 </button>
               </div>
             </div>
