@@ -45,7 +45,7 @@ export default function Welcome() {
       <button className="btn btn-ghost btn-sm" style={{ position: "fixed", top: 16, right: 16 }} onClick={() => setLocale(locale === "th" ? "en" : "th")}>
         <Languages size={16} /> {locale === "th" ? "English" : "ไทย"}
       </button>
-      <Logo size={64} />
+      <Logo height={36} />
       <h1>{t("welcome.title")}</h1>
       <p className="muted sub">{t("welcome.subtitle")}</p>
       <div className="steps"><i className={step >= 1 ? "on" : ""} /><i className={step >= 2 ? "on" : ""} /></div>

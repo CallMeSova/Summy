@@ -67,7 +67,7 @@ export default function LoginPage() {
         <Languages size={16} /> {locale === "th" ? "English" : "ไทย"}
       </button>
 
-      <Logo size={48} />
+      <Logo height={36} />
       <h1>{mode === "register" ? t("auth.registerTitle") : t("auth.title")}</h1>
       <p className="muted sub">{t("auth.subtitle")}</p>
 

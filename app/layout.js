@@ -44,7 +44,7 @@ const pick = (v, allowed, d) => (allowed.includes(v) ? v : d);
 export default async function RootLayout({ children }) {
   const c = await cookies();
   const locale = pick(c.get("summy_locale")?.value, ["th", "en"], "th");
-  const theme = pick(c.get("summy_theme")?.value, ["light", "dark", "system"], "system");
+  const theme = pick(c.get("summy_theme")?.value, ["light", "dark", "system"], "light");
   const width = pick(c.get("summy_w")?.value, ["narrow", "comfortable", "wide"], "comfortable");
   const docFont = pick(c.get("summy_df")?.value, ["looped", "sarabun", "sans"], "looped");
   const fs = Number(c.get("summy_fs")?.value);

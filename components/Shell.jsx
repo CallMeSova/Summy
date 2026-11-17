@@ -9,23 +9,12 @@ import {
 import { useApp } from "./Providers";
 import { api } from "@/lib/client";
 
-export function Logo({ size = 28 }) {
+export function Logo({ size = 24, height }) {
+  const h = height || size;
   return (
-    <span className="logo" style={{ width: size, height: size }} aria-hidden="true">
-      <svg width={size * 0.58} height={size * 0.58} viewBox="0 0 24 24" fill="none">
-        <path
-          d="M5 4.5h9.5L19 9v10.5H5V4.5Z"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinejoin="round"
-        />
-        <path
-          d="M9 10h6M9 14h4"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-        />
-      </svg>
+    <span className="logo-lockup" style={{ height: h }}>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src="/logo.png" alt="Summy" className="logo-img" style={{ height: h, width: "auto" }} />
     </span>
   );
 }
@@ -172,8 +161,7 @@ export default function Shell({ children }) {
       <aside className={`sidebar ${drawer ? "open" : ""}`}>
         <div className="sidebar-top">
           <Link href="/" className="brand">
-            <Logo size={26} />
-            <span className="brand-name">{t("app.name")}</span>
+            <Logo height={22} />
             <span className="brand-badge">Docs</span>
           </Link>
         </div>
