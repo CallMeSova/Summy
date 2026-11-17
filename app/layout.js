@@ -39,6 +39,13 @@ export const metadata = {
   description: "Personal learning library & documentation reader",
 };
 
+export const viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 5,
+  viewportFit: "cover",
+};
+
 const pick = (v, allowed, d) => (allowed.includes(v) ? v : d);
 
 export default async function RootLayout({ children }) {

@@ -101,9 +101,10 @@
 
 /* ============ Base ============ */
 *, *::before, *::after { box-sizing: border-box; }
-html { -webkit-text-size-adjust: 100%; }
+html { -webkit-text-size-adjust: 100%; overflow-x: hidden; }
 body {
   margin: 0;
+  overflow-x: hidden;
   background: var(--bg);
   color: var(--text);
   font-family: var(--font-ui);
@@ -150,6 +151,8 @@ kbd {
   height: 56px; display: flex; align-items: center; justify-content: space-between;
   padding: 0 6px; border-bottom: 1px solid var(--border); margin: 0 -14px 8px; padding-left: 20px; padding-right: 14px;
 }
+.sidebar-close { display: none; }
+.mobile-nav { display: none; }
 .brand { display: inline-flex; align-items: center; gap: 9px; }
 .brand-name { font-weight: 700; font-size: 16px; letter-spacing: -0.03em; line-height: 1; }
 .brand-badge {
@@ -291,7 +294,7 @@ kbd {
 }
 .card.hoverable { transition: border-color .15s, background .15s; display: block; }
 .card.hoverable:hover { border-color: var(--border-hover); }
-.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 16px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr)); gap: 16px; }
 .chip {
   --chip: var(--primary);
   display: inline-flex; align-items: center; gap: 6px; padding: 2px 8px; font-size: 12px; font-weight: 500; border-radius: 999px;

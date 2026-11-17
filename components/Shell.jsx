@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard, Library, Search, Bookmark, History, Settings, PlusCircle, Menu, Moon, Sun,
-  Languages, Command, CornerDownLeft, BookOpen, FolderOpen, Monitor, LogOut,
+  Languages, Command, CornerDownLeft, BookOpen, FolderOpen, Monitor, LogOut, X,
 } from "lucide-react";
 import { useApp } from "./Providers";
 import { api } from "@/lib/client";
@@ -144,6 +144,7 @@ export default function Shell({ children }) {
   const ThemeIcon = theme === "dark" ? Moon : theme === "light" ? Sun : Monitor;
   const nextTheme = { light: "dark", dark: "system", system: "light" }[theme];
   const initialLetter = (user.name || user.email || "U")[0].toUpperCase();
+  const isReader = /^\/lessons\/\d+$/.test(path);
 
   function toggleMenu() {
     if (typeof window !== "undefined" && window.innerWidth <= 1024) {
@@ -164,6 +165,14 @@ export default function Shell({ children }) {
             <Logo height={22} />
             <span className="brand-badge">Docs</span>
           </Link>
+          <button
+            type="button"
+            className="icon-btn sm sidebar-close"
+            onClick={() => setDrawer(false)}
+            aria-label={t("common.close")}
+          >
+            <X size={16} />
+          </button>
         </div>
 
         <nav className="nav">
@@ -238,7 +247,34 @@ export default function Shell({ children }) {
             </button>
           </div>
         </header>
-        <main className="content">{children}</main>
+        <main className={`content ${!isReader ? "has-mobile-nav" : ""}`}>{children}</main>
+        {!isReader && (
+          <nav className="mobile-nav" aria-label={t("nav.main")}>
+            <Link href="/" className={`mobile-nav-item ${path === "/" ? "active" : ""}`}>
+              <LayoutDashboard size={18} />
+              <span>{t("nav.dashboard")}</span>
+            </Link>
+            <Link
+              href="/library"
+              className={`mobile-nav-item ${path.startsWith("/library") || path.startsWith("/courses") ? "active" : ""}`}
+            >
+              <Library size={18} />
+              <span>{t("nav.library")}</span>
+            </Link>
+            <Link href="/lessons/new" className={`mobile-nav-item add ${path === "/lessons/new" ? "active" : ""}`}>
+              <PlusCircle size={20} />
+              <span>{t("course.addLesson")}</span>
+            </Link>
+            <Link href="/bookmarks" className={`mobile-nav-item ${path.startsWith("/bookmarks") ? "active" : ""}`}>
+              <Bookmark size={18} />
+              <span>{t("nav.bookmarks")}</span>
+            </Link>
+            <Link href="/settings" className={`mobile-nav-item ${path.startsWith("/settings") ? "active" : ""}`}>
+              <Settings size={18} />
+              <span>{t("nav.settings")}</span>
+            </Link>
+          </nav>
+        )}
       </div>
       <Palette open={palette} onClose={() => setPalette(false)} />
     </div>

@@ -2,12 +2,12 @@
 import { use, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
-  ChevronLeft, ChevronRight, ChevronDown, Minus, Plus, Maximize2, Minimize2, Pencil, CheckCircle2, Check, ExternalLink, FileWarning, Type, ChevronsDownUp, ChevronsUpDown, ClipboardCheck,
+  ChevronLeft, ChevronRight, ChevronDown, Minus, Plus, Maximize2, Minimize2, Pencil, CheckCircle2, Check, ExternalLink, FileWarning, Type, ChevronsDownUp, ChevronsUpDown, ClipboardCheck, List,
 } from "lucide-react";
 import dynamic from "next/dynamic";
 import { useApp } from "@/components/Providers";
 import { api, useFetch, invalidateCache, preloadAll } from "@/lib/client";
-import { Breadcrumbs, BookmarkButton, TypeBadge, ErrorState, Skeleton, EmptyState } from "@/components/ui";
+import { Breadcrumbs, BookmarkButton, TypeBadge, ErrorState, Skeleton, EmptyState, Modal } from "@/components/ui";
 import { MarkdownView } from "@/components/content";
 import QuizModal, { extractQuizFromMarkdown } from "@/components/QuizModal";
 
@@ -47,6 +47,7 @@ export default function Reader({ params }) {
   const [activeToc, setActiveToc] = useState("");
   const [ready, setReady] = useState(0);
   const [quizOpen, setQuizOpen] = useState(false);
+  const [tocMobileOpen, setTocMobileOpen] = useState(false);
   const restored = useRef(false);
   const saveTimer = useRef(null);
   const pending = useRef(null);
@@ -207,13 +208,28 @@ export default function Reader({ params }) {
               <button className="icon-btn sm" onClick={() => setFontSize(fontSize - 1)} title={t("reader.fontSmaller")} aria-label={t("reader.fontSmaller")}><Minus size={14} /></button>
               <span className="fs">{fontSize}px</span>
               <button className="icon-btn sm" onClick={() => setFontSize(fontSize + 1)} title={t("reader.fontLarger")} aria-label={t("reader.fontLarger")}><Plus size={14} /></button>
-              <span className="div" />
-              <div className="seg" style={{ border: 0, background: "transparent", padding: 0 }} role="group" aria-label={t("reader.width")}>
+              <span className="div hide-sm" />
+              <div className="seg hide-sm" style={{ border: 0, background: "transparent", padding: 0 }} role="group" aria-label={t("reader.width")}>
                 {["narrow", "comfortable", "wide"].map((w) => (
                   <button key={w} className={width === w ? "on" : ""} onClick={() => setWidth(w)} style={{ padding: "4px 9px" }}>{t(`reader.${w}`)}</button>
                 ))}
               </div>
               <span className="div" />
+            </>
+          )}
+          {!isPdf && tocGroups.length > 0 && (
+            <>
+              <button
+                type="button"
+                className="icon-btn sm toc-mobile-btn"
+                onClick={() => setTocMobileOpen(true)}
+                title={t("reader.toc")}
+                aria-label={t("reader.toc")}
+              >
+                <List size={14} />
+                <span>{t("reader.toc")}</span>
+              </button>
+              <span className="div toc-mobile-div" />
             </>
           )}
           {quiz && (
@@ -236,7 +252,7 @@ export default function Reader({ params }) {
           )}
           <BookmarkButton active={lesson.bookmarked} onClick={toggleBookmark} />
           <Link href={`/lessons/${id}/edit`} className="icon-btn sm" title={t("reader.edit")} aria-label={t("reader.edit")}><Pencil size={15} /></Link>
-          <button className={`icon-btn sm ${focus ? "on" : ""}`} onClick={() => setFocus(!focus)} title={focus ? t("reader.exitFocus") : t("reader.focus")} aria-label={t("reader.focus")}>
+          <button className={`icon-btn sm hide-sm ${focus ? "on" : ""}`} onClick={() => setFocus(!focus)} title={focus ? t("reader.exitFocus") : t("reader.focus")} aria-label={t("reader.focus")}>
             {focus ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
           </button>
         </div>
@@ -373,6 +389,56 @@ export default function Reader({ params }) {
           <Link href={`/lessons/${lesson.next.id}`} className="btn btn-primary btn-sm" title={lesson.next.title}><span className="hide-sm">{t("reader.next")}</span><ChevronRight size={15} /></Link>
         ) : <span className="btn btn-primary btn-sm" style={{ opacity: 0.35 }}><ChevronRight size={15} /></span>}
       </div>
+
+      <Modal open={tocMobileOpen} onClose={() => setTocMobileOpen(false)} title={t("reader.toc")} size="sm">
+        <div className="toc-tree">
+          {tocGroups.map((g) => {
+            const hasKids = g.children.length > 0;
+            const childActive = g.children.some((c) => c.id === activeToc);
+            const parentActive = activeToc === g.id || childActive;
+            return (
+              <div key={g.id} className={`toc-group ${parentActive ? "in-view" : ""}`}>
+                <div className={`toc-parent-row ${activeToc === g.id ? "on" : ""}`}>
+                  <span className="toc-bullet" aria-hidden="true" />
+                  <a
+                    href={`#${g.id}`}
+                    className={`toc-parent ${activeToc === g.id ? "on" : ""}`}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      setTocMobileOpen(false);
+                      setTimeout(() => {
+                        document.getElementById(g.id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+                      }, 60);
+                    }}
+                  >
+                    <span className="toc-parent-text">{g.text}</span>
+                  </a>
+                </div>
+                {hasKids && (
+                  <div className="toc-children">
+                    {g.children.map((c) => (
+                      <a
+                        key={c.id}
+                        href={`#${c.id}`}
+                        className={`toc-sub l${c.level} ${activeToc === c.id ? "on" : ""}`}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          setTocMobileOpen(false);
+                          setTimeout(() => {
+                            document.getElementById(c.id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+                          }, 60);
+                        }}
+                      >
+                        {c.text}
+                      </a>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </Modal>
 
       <QuizModal
         open={quizOpen}
