@@ -269,16 +269,74 @@
 .prose input[type="checkbox"] { margin-right: .5em; }
 .math-block { margin: 1.2em 0; overflow-x: auto; padding: 4px 0; }
 
-/* AI Prompt Bar & Modal */
-.prompt-bar {
-  display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
-  padding: 12px 16px; border-radius: var(--r-card); border: 1px solid var(--border); background: var(--bg-subtle);
+/* AI Prompt Card & Modal */
+.prompt-card {
+  border-radius: var(--r-card);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  overflow: hidden;
 }
-.prompt-bar-info { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 220px; flex-wrap: wrap; }
+.prompt-card-main {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 18px;
+}
+.prompt-card-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  min-width: 0;
+  flex: 1;
+}
+.prompt-card-copy {
+  min-width: 0;
+  flex: 1;
+}
+.prompt-card-copy b {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--text);
+}
+.prompt-card-copy p {
+  margin-top: 2px;
+  line-height: 1.45;
+}
+.prompt-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+}
+.prompt-card-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 9px 18px;
+  border-top: 1px solid var(--border);
+  background: var(--bg-subtle);
+}
+.prompt-checks {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.prompt-samples {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+}
 .prompt-badge {
-  display: inline-flex; align-items: center; gap: 5px; padding: 3px 8px; border-radius: 5px;
-  font-family: var(--font-code); font-size: 11.5px; font-weight: 600;
-  border: 1px solid var(--soft-accent); background: var(--accent); color: var(--primary); white-space: nowrap;
+  display: inline-flex; align-items: center; gap: 5px; padding: 4px 8px; border-radius: 5px;
+  font-family: var(--font-code); font-size: 11px; font-weight: 600; margin-top: 1px;
+  border: 1px solid var(--soft-accent); background: var(--accent); color: var(--primary); white-space: nowrap; flex: none;
 }
 .prompt-options {
   display: grid; gap: 10px; padding: 14px; border-radius: var(--r-card);
@@ -389,12 +447,23 @@
 }
 .prompt-check {
   display: inline-flex; align-items: center; gap: 7px;
-  padding: 4px 10px; border-radius: 6px; border: 1px solid var(--border);
-  background: var(--surface); font-size: 12.5px; font-weight: 500; color: var(--text);
+  font-size: 12.5px; font-weight: 500; color: var(--text);
   cursor: pointer; user-select: none;
 }
 .prompt-check input[type="checkbox"] {
   accent-color: var(--primary); width: 14px; height: 14px; margin: 0; cursor: pointer;
+}
+@media (max-width: 720px) {
+  .prompt-card-main {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .prompt-card-actions {
+    width: 100%;
+  }
+  .prompt-card-actions .btn {
+    flex: 1;
+  }
 }
 .quiz-preview-bar {
   display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap;

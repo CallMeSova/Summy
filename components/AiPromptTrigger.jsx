@@ -20,7 +20,7 @@ async function copyText(text) {
   document.body.removeChild(ta);
 }
 
-export default function AiPromptTrigger({ onInsertSample, onInsertQuizSample, compact = false }) {
+export default function AiPromptTrigger({ onInsertSample, onInsertQuizSample }) {
   const { t, locale, toast } = useApp();
   const [copied, setCopied] = useState(false);
   const [open, setOpen] = useState(false);
@@ -51,56 +51,80 @@ export default function AiPromptTrigger({ onInsertSample, onInsertQuizSample, co
 
   return (
     <>
-      <div className="prompt-bar">
-        <div className="prompt-bar-info">
-          <span className="prompt-badge">
-            <Sparkles size={13} /> AI PDF → MD
-          </span>
-          {!compact && <span className="muted small">{t("prompt.barHint")}</span>}
-          <label className="prompt-check">
-            <input
-              type="checkbox"
-              checked={includeQuiz}
-              onChange={(e) => setIncludeQuiz(e.target.checked)}
-            />
-            <span>{t("prompt.includeQuizCheck")}</span>
-          </label>
+      <div className="prompt-card">
+        <div className="prompt-card-main">
+          <div className="prompt-card-head">
+            <span className="prompt-badge">
+              <Sparkles size={12} /> AI PDF → MD
+            </span>
+            <div className="prompt-card-copy">
+              <b>{t("prompt.cardTitle")}</b>
+              <p className="muted small">{t("prompt.barHint")}</p>
+            </div>
+          </div>
+
+          <div className="prompt-card-actions">
+            <button type="button" className="btn btn-primary btn-sm" onClick={handleCopy}>
+              {copied ? <Check size={14} /> : <Copy size={14} />}
+              {copied ? t("prompt.copiedBtn") : t("prompt.copyBtn")}
+            </button>
+            <button
+              type="button"
+              className="btn btn-secondary btn-sm"
+              onClick={() => setOpen(true)}
+              title={t("prompt.customizeBtn")}
+            >
+              <SlidersHorizontal size={14} />
+              {t("prompt.customizeBtn")}
+            </button>
+          </div>
         </div>
-        <div className="row" style={{ gap: 6, flexWrap: "wrap" }}>
-          <button type="button" className="btn btn-primary btn-sm" onClick={handleCopy}>
-            {copied ? <Check size={14} /> : <Copy size={14} />}
-            {copied ? t("prompt.copiedBtn") : t("prompt.copyBtn")}
-          </button>
-          <button
-            type="button"
-            className="btn btn-secondary btn-sm"
-            onClick={() => setOpen(true)}
-            title={t("prompt.customizeBtn")}
-          >
-            <SlidersHorizontal size={14} />
-            {t("prompt.customizeBtn")}
-          </button>
-          {onInsertSample && (
-            <button
-              type="button"
-              className="btn btn-ghost btn-sm"
-              onClick={onInsertSample}
-              title={t("prompt.insertMermaid")}
-            >
-              <GitBranch size={14} />
-              {t("prompt.insertMermaid")}
-            </button>
-          )}
-          {onInsertQuizSample && (
-            <button
-              type="button"
-              className="btn btn-ghost btn-sm"
-              onClick={onInsertQuizSample}
-              title={t("prompt.insertQuiz")}
-            >
-              <ClipboardCheck size={14} />
-              {t("prompt.insertQuiz")}
-            </button>
+
+        <div className="prompt-card-foot">
+          <div className="prompt-checks">
+            <label className="prompt-check">
+              <input
+                type="checkbox"
+                checked={includeMermaid}
+                onChange={(e) => setIncludeMermaid(e.target.checked)}
+              />
+              <span>{t("prompt.includeMermaidCheck")}</span>
+            </label>
+            <label className="prompt-check">
+              <input
+                type="checkbox"
+                checked={includeQuiz}
+                onChange={(e) => setIncludeQuiz(e.target.checked)}
+              />
+              <span>{t("prompt.includeQuizCheck")}</span>
+            </label>
+          </div>
+
+          {(onInsertSample || onInsertQuizSample) && (
+            <div className="prompt-samples">
+              {onInsertSample && (
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-sm"
+                  onClick={onInsertSample}
+                  title={t("prompt.insertMermaid")}
+                >
+                  <GitBranch size={13} />
+                  {t("prompt.insertMermaid")}
+                </button>
+              )}
+              {onInsertQuizSample && (
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-sm"
+                  onClick={onInsertQuizSample}
+                  title={t("prompt.insertQuiz")}
+                >
+                  <ClipboardCheck size={13} />
+                  {t("prompt.insertQuiz")}
+                </button>
+              )}
+            </div>
           )}
         </div>
       </div>
