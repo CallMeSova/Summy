@@ -67,9 +67,10 @@ export default function LoginPage() {
         <Languages size={16} /> {locale === "th" ? "English" : "ไทย"}
       </button>
 
-      <Logo height={36} />
-      <h1>{mode === "register" ? t("auth.registerTitle") : t("auth.title")}</h1>
-      <p className="muted sub">{t("auth.subtitle")}</p>
+      <Logo height={38} />
+      <h1 style={{ marginBottom: 20 }}>
+        {mode === "register" ? t("auth.tabRegister") : t("auth.tabLogin")}
+      </h1>
 
       <form className="card stack" style={{ gap: 16 }} onSubmit={submit} noValidate>
         <div className="seg" style={{ width: "100%" }}>
