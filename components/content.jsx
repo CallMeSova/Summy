@@ -163,6 +163,9 @@ export function renderMarkdown(src) {
   // 6. Restore stashed HTML tokens
   raw = raw.replace(/@@SUMMY_TOKEN_(\d+)@@/g, (_m, idx) => stash[Number(idx)] ?? "");
 
+  // 7. Wrap tables in a scrollable container so columns never get crushed
+  raw = raw.replace(/<table(\b[^>]*)>([\s\S]*?)<\/table>/gi, '<div class="table-wrap"><table$1>$2</table></div>');
+
   return DOMPurify.sanitize(raw, {
     ADD_ATTR: ["target", "data-mermaid", "aria-hidden", "style"],
     ADD_TAGS: [

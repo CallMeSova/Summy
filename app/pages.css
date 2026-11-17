@@ -177,7 +177,7 @@
   letter-spacing: 0.004em;
   color: var(--text);
   word-wrap: break-word;
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
 }
 .prose > :first-child { margin-top: 0; }
 .prose h1, .prose h2, .prose h3, .prose h4 {
@@ -244,27 +244,53 @@
   font-size: 0.86em;
 }
 .prose img { max-width: 100%; border-radius: 8px; border: 1px solid var(--border); height: auto; }
+.prose .table-wrap {
+  width: 100%;
+  margin: 1.5em 0;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+}
 .prose table {
   border-collapse: separate;
   border-spacing: 0;
   width: 100%;
+  font-size: 0.92em;
+  overflow-wrap: normal;
+  word-wrap: normal;
+  word-break: normal;
+}
+.prose > table {
   margin: 1.5em 0;
   display: block;
   overflow-x: auto;
-  font-size: 0.92em;
+  -webkit-overflow-scrolling: touch;
   border: 1px solid var(--border);
   border-radius: 8px;
 }
 .prose th, .prose td {
   border-bottom: 1px solid var(--border);
   border-right: 1px solid var(--border);
-  padding: 9px 13px;
+  padding: 10px 14px;
   text-align: left;
   vertical-align: top;
+  overflow-wrap: normal;
+  word-wrap: normal;
+  word-break: normal;
+  min-width: 130px;
+}
+.prose th:first-child, .prose td:first-child {
+  min-width: 150px;
 }
 .prose th:last-child, .prose td:last-child { border-right: 0; }
 .prose tr:last-child td { border-bottom: 0; }
-.prose th { background: var(--bg-subtle); font-weight: 600; }
+.prose th {
+  background: var(--bg-subtle);
+  font-weight: 600;
+  white-space: nowrap;
+}
 .prose hr { border: 0; border-top: 1px solid var(--border); margin: 2.2em 0; }
 .prose input[type="checkbox"] { margin-right: .5em; }
 .math-block { margin: 1.2em 0; overflow-x: auto; padding: 4px 0; }
