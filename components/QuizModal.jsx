@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { CheckCircle2, XCircle, RotateCcw, Eye, EyeOff, HelpCircle, Check } from "lucide-react";
 import { Modal } from "./ui";
 import { useApp } from "./Providers";
+import { api } from "@/lib/client";
 
 /**
  * Extracts a ```summy-quiz or ```quiz JSON block from Markdown source,
@@ -19,7 +20,6 @@ export function extractQuizFromMarkdown(src) {
   const cleanMd = src.replace(regex, (_full, rawJson) => {
     matched = true;
     try {
-      // Tolerate accidental trailing commas before ] or }
       const sanitized = String(rawJson)
         .trim()
         .replace(/,\s*([\]}])/g, "$1");
@@ -62,7 +62,7 @@ export function extractQuizFromMarkdown(src) {
 const TH_LABELS = ["ก", "ข", "ค", "ง", "จ"];
 const EN_LABELS = ["A", "B", "C", "D", "E"];
 
-export default function QuizModal({ open, onClose, quiz, lessonTitle }) {
+export default function QuizModal({ open, onClose, quiz, lessonId, lessonTitle, onScoreSaved }) {
   const { t, locale } = useApp();
   const [tab, setTab] = useState("mcq");
   const [selected, setSelected] = useState({});
@@ -97,6 +97,18 @@ export default function QuizModal({ open, onClose, quiz, lessonTitle }) {
     0
   );
 
+  function persistScore(score, total) {
+    if (!lessonId || !total) return;
+    api(`/lessons/${lessonId}/progress`, {
+      method: "PUT",
+      json: { quiz_score: score, quiz_total: total },
+    })
+      .then(() => {
+        onScoreSaved?.({ quiz_score: score, quiz_total: total });
+      })
+      .catch(() => {});
+  }
+
   function submitAllMcq() {
     const allChecked = {};
     mcq.forEach((_, idx) => {
@@ -104,6 +116,16 @@ export default function QuizModal({ open, onClose, quiz, lessonTitle }) {
     });
     setCheckedMcq(allChecked);
     setSubmittedAll(true);
+    persistScore(correctCount, mcq.length);
+  }
+
+  function checkSingleMcq(qi) {
+    const next = { ...checkedMcq, [qi]: true };
+    setCheckedMcq(next);
+    if (mcq.length > 0 && mcq.every((_, idx) => next[idx])) {
+      setSubmittedAll(true);
+      persistScore(correctCount, mcq.length);
+    }
   }
 
   function revealAllShort() {
@@ -236,7 +258,7 @@ export default function QuizModal({ open, onClose, quiz, lessonTitle }) {
                       <button
                         type="button"
                         className="btn btn-secondary btn-sm"
-                        onClick={() => setCheckedMcq((prev) => ({ ...prev, [qi]: true }))}
+                        onClick={() => checkSingleMcq(qi)}
                       >
                         <HelpCircle size={13} /> {t("quiz.checkOne")}
                       </button>

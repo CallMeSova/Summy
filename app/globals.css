@@ -308,6 +308,27 @@ kbd {
 .badge-done { color: var(--success); border-color: rgba(13, 148, 136, .28); background: rgba(13, 148, 136, .08); }
 .badge-progress { color: var(--warn); border-color: rgba(217, 119, 6, .28); background: rgba(217, 119, 6, .08); }
 .badge-idle { background: var(--surface-2); color: var(--muted); }
+.lesson-quiz-btn {
+  color: var(--primary);
+  border-color: var(--soft-accent);
+  background: var(--accent);
+  padding: 3px 9px;
+  cursor: pointer;
+  transition: background .14s, border-color .14s;
+}
+.lesson-quiz-btn:hover:not(:disabled) {
+  background: var(--soft-accent);
+  border-color: var(--primary);
+}
+.lesson-quiz-btn.scored {
+  color: var(--success);
+  border-color: rgba(13, 148, 136, .35);
+  background: rgba(13, 148, 136, .1);
+}
+.lesson-quiz-btn.scored:hover:not(:disabled) {
+  border-color: var(--success);
+  background: rgba(13, 148, 136, .16);
+}
 
 .pbar { height: 5px; border-radius: 99px; background: var(--surface-2); overflow: hidden; }
 .pbar.thin { height: 3px; }

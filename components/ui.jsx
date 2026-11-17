@@ -3,9 +3,11 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import {
   X, ChevronRight, Bookmark, BookmarkCheck, MoreHorizontal, FileText, FileType2, PenLine,
-  CheckCircle2, Circle, PlayCircle, AlertTriangle, Inbox,
+  CheckCircle2, Circle, PlayCircle, AlertTriangle, Inbox, ClipboardCheck,
 } from "lucide-react";
 import { useApp } from "./Providers";
+import { api } from "@/lib/client";
+import QuizModal, { extractQuizFromMarkdown } from "./QuizModal";
 
 export function Modal({ open, onClose, title, children, footer, size = "md" }) {
   const { t } = useApp();
@@ -201,8 +203,12 @@ export function TypeBadge({ type }) {
 
 export function StatusBadge({ progress, completed }) {
   const { t } = useApp();
-  if (completed) return <span className="badge badge-done"><CheckCircle2 size={12} />{t("status.completed")}</span>;
-  if (progress > 0) return <span className="badge badge-progress"><PlayCircle size={12} />{t("status.inProgress")} {Math.round(progress)}%</span>;
+  if (completed || Math.round(progress) >= 100) {
+    return <span className="badge badge-done"><CheckCircle2 size={12} />{t("status.completed")}</span>;
+  }
+  if (progress > 0) {
+    return <span className="badge badge-progress"><PlayCircle size={12} />{t("status.inProgress")} {Math.round(progress)}%</span>;
+  }
   return <span className="badge badge-idle"><Circle size={12} />{t("status.notStarted")}</span>;
 }
 
@@ -228,21 +234,95 @@ export function CourseCard({ course, actions }) {
 }
 
 export function LessonItem({ lesson, index, actions, href }) {
+  const { t, toast } = useApp();
+  const [quizOpen, setQuizOpen] = useState(false);
+  const [quizData, setQuizData] = useState(null);
+  const [loadingQuiz, setLoadingQuiz] = useState(false);
+  const [scoreState, setScoreState] = useState({
+    score: lesson.quiz_score,
+    total: lesson.quiz_total,
+  });
+
+  useEffect(() => {
+    setScoreState({ score: lesson.quiz_score, total: lesson.quiz_total });
+  }, [lesson.quiz_score, lesson.quiz_total]);
+
+  const isDone = lesson.completed || Math.round(lesson.progress) >= 100;
+  const hasScore = scoreState.score !== null && scoreState.score !== undefined && Number(scoreState.total) > 0;
+
+  async function openQuizModal(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (quizData) {
+      setQuizOpen(true);
+      return;
+    }
+    setLoadingQuiz(true);
+    try {
+      const full = await api(`/lessons/${lesson.id}`);
+      const { quiz } = extractQuizFromMarkdown(full.content_md);
+      if (quiz) {
+        setQuizData(quiz);
+        setQuizOpen(true);
+      }
+    } catch (err) {
+      toast(err.message || t("common.error"), "error");
+    } finally {
+      setLoadingQuiz(false);
+    }
+  }
+
   return (
-    <Link href={href || `/lessons/${lesson.id}`} className="lesson-item">
-      <span className={`lesson-num ${lesson.completed ? "done" : ""}`}>
-        {lesson.completed ? <CheckCircle2 size={18} /> : index}
-      </span>
-      <div className="lesson-main">
-        <div className="lesson-title">{lesson.title}</div>
-        {lesson.description && <div className="muted small clamp-1">{lesson.description}</div>}
-      </div>
-      <div className="lesson-meta">
-        <TypeBadge type={lesson.content_type} />
-        <StatusBadge progress={lesson.progress} completed={lesson.completed} />
-      </div>
-      {actions && <div className="lesson-actions">{actions}</div>}
-    </Link>
+    <>
+      <Link href={href || `/lessons/${lesson.id}`} className="lesson-item">
+        <span className={`lesson-num ${isDone ? "done" : ""}`}>
+          {isDone ? <CheckCircle2 size={18} /> : index}
+        </span>
+        <div className="lesson-main">
+          <div className="lesson-title">{lesson.title}</div>
+          {lesson.description && <div className="muted small clamp-1">{lesson.description}</div>}
+        </div>
+        <div className="lesson-meta">
+          {lesson.has_quiz && (
+            <button
+              type="button"
+              className={`badge lesson-quiz-btn ${hasScore ? "scored" : ""}`}
+              onClick={openQuizModal}
+              disabled={loadingQuiz}
+              title={
+                hasScore
+                  ? t("quiz.listScoreTitle", { a: scoreState.score, b: scoreState.total })
+                  : t("quiz.listTake")
+              }
+            >
+              <ClipboardCheck size={12} />
+              <span>
+                {loadingQuiz
+                  ? t("common.loading")
+                  : hasScore
+                  ? t("quiz.listScore", { a: scoreState.score, b: scoreState.total })
+                  : t("quiz.listTake")}
+              </span>
+            </button>
+          )}
+          <TypeBadge type={lesson.content_type} />
+          <StatusBadge progress={lesson.progress} completed={isDone} />
+        </div>
+        {actions && <div className="lesson-actions">{actions}</div>}
+      </Link>
+
+      {quizData && (
+        <QuizModal
+          open={quizOpen}
+          onClose={() => setQuizOpen(false)}
+          quiz={quizData}
+          lessonId={lesson.id}
+          lessonTitle={lesson.title}
+          onScoreSaved={({ quiz_score, quiz_total }) =>
+            setScoreState({ score: quiz_score, total: quiz_total })
+          }
+        />
+      )}
+    </>
   );
 }
-

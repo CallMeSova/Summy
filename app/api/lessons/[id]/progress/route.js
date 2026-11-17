@@ -4,7 +4,7 @@ import { requireUser } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
-/** body: { progress?: 0-100, completed?: bool, open?: bool } */
+/** body: { progress?: 0-100, completed?: bool, open?: bool, quiz_score?: int, quiz_total?: int } */
 export const PUT = handler(async (req, { params }) => {
   const user = await requireUser();
   const id = intId((await params).id);
@@ -22,32 +22,54 @@ export const PUT = handler(async (req, { params }) => {
   const cur = await get("SELECT * FROM reading_progress WHERE user_id=? AND lesson_id=?", user.id, id);
   let progress = cur ? Number(cur.progress) : 0;
   let completed = cur ? Number(cur.completed) : 0;
+  let quizScore = cur?.quiz_score !== undefined && cur?.quiz_score !== null ? Number(cur.quiz_score) : null;
+  let quizTotal = cur?.quiz_total !== undefined && cur?.quiz_total !== null ? Number(cur.quiz_total) : null;
+
   if (b.progress !== undefined) {
     const p = Math.max(0, Math.min(100, Number(b.progress) || 0));
     progress = b.reset ? p : Math.max(progress, p);
-    if (progress >= 99.5 && b.autoComplete) completed = 1;
+    if (progress >= 99.5) {
+      progress = 100;
+      completed = 1;
+    }
   }
   if (b.completed !== undefined) {
     completed = b.completed ? 1 : 0;
     if (completed) progress = 100;
-    else if (b.reset !== false && progress >= 100) progress = 0;
+    else if (b.reset !== false && progress >= 99.5) progress = 0;
   }
+  if (b.quiz_score !== undefined && b.quiz_total !== undefined) {
+    const qt = Math.max(1, Number(b.quiz_total) || 1);
+    const qs = Math.max(0, Math.min(qt, Number(b.quiz_score) || 0));
+    quizScore = qs;
+    quizTotal = qt;
+  }
+
   await tx(async () => {
     await run(
-      `INSERT INTO reading_progress (user_id, lesson_id, progress, completed, last_read_at)
-       VALUES (?,?,?,?,strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+      `INSERT INTO reading_progress (user_id, lesson_id, progress, completed, quiz_score, quiz_total, last_read_at)
+       VALUES (?,?,?,?,?,?,strftime('%Y-%m-%dT%H:%M:%fZ','now'))
        ON CONFLICT(user_id, lesson_id) DO UPDATE SET
          progress=excluded.progress,
          completed=excluded.completed,
+         quiz_score=excluded.quiz_score,
+         quiz_total=excluded.quiz_total,
          last_read_at=excluded.last_read_at`,
       user.id,
       id,
       progress,
-      completed
+      completed,
+      quizScore,
+      quizTotal
     );
     if (b.open) {
       await run("INSERT INTO reading_history (user_id, lesson_id) VALUES (?,?)", user.id, id);
     }
   });
-  return ok({ progress, completed: !!completed });
+  return ok({
+    progress,
+    completed: !!completed,
+    quiz_score: quizScore,
+    quiz_total: quizTotal,
+  });
 });

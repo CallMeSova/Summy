@@ -14,7 +14,7 @@ export const GET = handler(async () => {
        (SELECT COUNT(*) FROM subjects WHERE user_id=?) AS subjects,
        (SELECT COUNT(*) FROM courses c JOIN subjects s ON s.id=c.subject_id WHERE s.user_id=?) AS courses,
        (SELECT COUNT(*) FROM lessons l JOIN courses c ON c.id=l.course_id JOIN subjects s ON s.id=c.subject_id WHERE s.user_id=?) AS lessons,
-       (SELECT COUNT(*) FROM reading_progress rp JOIN lessons l ON l.id=rp.lesson_id JOIN courses c ON c.id=l.course_id JOIN subjects s ON s.id=c.subject_id WHERE rp.user_id=? AND s.user_id=? AND rp.completed=1) AS completed,
+       (SELECT COUNT(*) FROM reading_progress rp JOIN lessons l ON l.id=rp.lesson_id JOIN courses c ON c.id=l.course_id JOIN subjects s ON s.id=c.subject_id WHERE rp.user_id=? AND s.user_id=? AND (rp.completed=1 OR rp.progress>=99.5)) AS completed,
        (SELECT COUNT(*) FROM bookmarks b JOIN lessons l ON l.id=b.lesson_id JOIN courses c ON c.id=l.course_id JOIN subjects s ON s.id=c.subject_id WHERE b.user_id=? AND s.user_id=?) AS bookmarks`,
     uid,
     uid,

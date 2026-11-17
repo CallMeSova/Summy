@@ -111,6 +111,9 @@ export default function Reader({ params }) {
         const max = document.documentElement.scrollHeight - window.innerHeight;
         const pct = max > 0 ? Math.min(100, Math.max(0, (window.scrollY / max) * 100)) : 100;
         setProg((p) => (lesson.completed ? 100 : Math.max(p, pct)));
+        if (pct >= 99.5 && !lesson.completed) {
+          setData((prev) => (prev ? { ...prev, completed: true, progress: 100 } : prev));
+        }
         if (restored.current) {
           pending.current = pct;
           clearTimeout(saveTimer.current);
@@ -217,7 +220,11 @@ export default function Reader({ params }) {
                 title={t("quiz.openBtn", { n: quiz.total })}
               >
                 <ClipboardCheck size={14} />
-                <span>{t("quiz.openBtn", { n: quiz.total })}</span>
+                <span>
+                  {lesson.quiz_score !== null && lesson.quiz_score !== undefined && Number(lesson.quiz_total) > 0
+                    ? t("quiz.listScore", { a: lesson.quiz_score, b: lesson.quiz_total })
+                    : t("quiz.openBtn", { n: quiz.total })}
+                </span>
               </button>
               <span className="div" />
             </>
@@ -264,7 +271,9 @@ export default function Reader({ params }) {
             {quiz && (
               <button type="button" className="btn btn-secondary" onClick={() => setQuizOpen(true)}>
                 <ClipboardCheck size={16} />
-                {t("quiz.openBtnFull", { m: quiz.mcq.length, s: quiz.short.length })}
+                {lesson.quiz_score !== null && lesson.quiz_score !== undefined && Number(lesson.quiz_total) > 0
+                  ? `${t("quiz.listScore", { a: lesson.quiz_score, b: lesson.quiz_total })} · ${t("quiz.openBtnFull", { m: quiz.mcq.length, s: quiz.short.length })}`
+                  : t("quiz.openBtnFull", { m: quiz.mcq.length, s: quiz.short.length })}
               </button>
             )}
           </div>
@@ -364,7 +373,11 @@ export default function Reader({ params }) {
         open={quizOpen}
         onClose={() => setQuizOpen(false)}
         quiz={quiz}
+        lessonId={lesson.id}
         lessonTitle={lesson.title}
+        onScoreSaved={({ quiz_score, quiz_total }) =>
+          setData((prev) => (prev ? { ...prev, quiz_score, quiz_total } : prev))
+        }
       />
     </div>
   );
